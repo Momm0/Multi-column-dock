@@ -37,7 +37,7 @@ A sleek, customizable multi-column dock extension for GNOME Shell that brings a 
 
 3. Enable the extension:
    ```bash
-   gnome-extensions enable multi-column-dock@ali.example.com
+   gnome-extensions enable AITwinMinds@gmail.com
    ```
 
 4. Restart GNOME Shell:
@@ -48,13 +48,13 @@ A sleek, customizable multi-column dock extension for GNOME Shell that brings a 
 
 1. Copy the extension files to your GNOME extensions directory:
    ```bash
-   mkdir -p ~/.local/share/gnome-shell/extensions/multi-column-dock@ali.example.com
-   cp -r * ~/.local/share/gnome-shell/extensions/multi-column-dock@ali.example.com/
+   mkdir -p ~/.local/share/gnome-shell/extensions/AITwinMinds@gmail.com
+   cp -r * ~/.local/share/gnome-shell/extensions/AITwinMinds@gmail.com/
    ```
 
 2. Compile the schemas:
    ```bash
-   glib-compile-schemas ~/.local/share/gnome-shell/extensions/multi-column-dock@ali.example.com/schemas/
+   glib-compile-schemas ~/.local/share/gnome-shell/extensions/AITwinMinds@gmail.com/schemas/
    ```
 
 3. Restart GNOME Shell and enable the extension.
@@ -72,7 +72,7 @@ Open the extension preferences to customize:
 
 Access preferences via:
 ```bash
-gnome-extensions prefs multi-column-dock@ali.example.com
+gnome-extensions prefs AITwinMinds@gmail.com
 ```
 
 Or through the GNOME Extensions app.
@@ -85,8 +85,8 @@ Or through the GNOME Extensions app.
 ## 🗑️ Uninstallation
 
 ```bash
-gnome-extensions disable multi-column-dock@ali.example.com
-rm -rf ~/.local/share/gnome-shell/extensions/multi-column-dock@ali.example.com
+gnome-extensions disable AITwinMinds@gmail.com
+rm -rf ~/.local/share/gnome-shell/extensions/AITwinMinds@gmail.com
 ```
 
 ## 📄 License
