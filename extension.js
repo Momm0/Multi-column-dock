@@ -291,6 +291,15 @@ class DockView extends St.Widget {
             icon.set_x_align(Clutter.ActorAlign.CENTER);
             icon.set_y_align(Clutter.ActorAlign.CENTER);
 
+            // Override the default activate behavior to properly handle minimized windows
+            icon.connect('button-press-event', (actor, event) => {
+                if (event.get_button() === 1) { // Left click
+                    this._activateApp(app);
+                    return Clutter.EVENT_STOP;
+                }
+                return Clutter.EVENT_PROPAGATE;
+            });
+
             // Tooltip logic (use enter/leave for reliability)
             icon.connect('enter-event', () => {
                 this._showTooltip(icon, app.get_name());
@@ -335,6 +344,47 @@ class DockView extends St.Widget {
     }
 
     // (Removed duplicate _redisplay() implementation)
+
+    _activateApp(app) {
+        // Get all windows for this app
+        let windows = app.get_windows();
+        
+        if (windows.length === 0) {
+            // No windows, open a new one
+            app.open_new_window(-1);
+            Main.overview.hide();
+            return;
+        }
+
+        // Find the most recently used window
+        let workspace = global.workspace_manager.get_active_workspace();
+        let currentWindows = windows.filter(w => !w.skip_taskbar);
+        
+        if (currentWindows.length === 0) {
+            app.open_new_window(-1);
+            Main.overview.hide();
+            return;
+        }
+
+        // Sort windows by user time (most recent first)
+        currentWindows.sort((a, b) => b.get_user_time() - a.get_user_time());
+        let mostRecentWindow = currentWindows[0];
+
+        // Check if the window is minimized
+        if (mostRecentWindow.minimized) {
+            // Unminimize and activate the window
+            mostRecentWindow.unminimize();
+            mostRecentWindow.activate(global.get_current_time());
+        } else if (mostRecentWindow.has_focus()) {
+            // If focused, minimize it
+            mostRecentWindow.minimize();
+        } else {
+            // Otherwise, just activate it
+            mostRecentWindow.activate(global.get_current_time());
+        }
+        
+        Main.overview.hide();
+    }
 
     _showTooltip(actor, text) {
         this._tooltip.set_text(text);
