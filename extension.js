@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 import Shell from 'gi://Shell';
@@ -304,30 +305,34 @@ class DockView extends St.Widget {
             icon.set_x_align(Clutter.ActorAlign.CENTER);
             icon.set_y_align(Clutter.ActorAlign.CENTER);
 
-            // Override the default activate behavior to properly handle minimized windows
-            icon.connect('button-press-event', (actor, event) => {
-                if (event.get_button() === 1) { // Left click
-                    // Animate the icon: scale up then back to normal
-                    icon.set_pivot_point(0.5, 0.5);
-                    icon.ease({
-                        scale_x: 1.2,
-                        scale_y: 1.2,
-                        duration: 100,
-                        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                        onComplete: () => {
-                            icon.ease({
-                                scale_x: 1.0,
-                                scale_y: 1.0,
-                                duration: 150,
-                                mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
-                            });
-                        }
-                    });
+            // Set pivot point for animation (center of the icon)
+            icon.set_pivot_point(0.5, 0.5);
+
+            // Create a wrapper to capture all clicks reliably
+            let clickAction = new Clutter.ClickAction();
+            clickAction.connect('clicked', () => {
+                // Animate the icon: scale up then back to normal
+                icon.ease({
+                    scale_x: 1.3,
+                    scale_y: 1.3,
+                    duration: 80,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    onComplete: () => {
+                        icon.ease({
+                            scale_x: 1.0,
+                            scale_y: 1.0,
+                            duration: 120,
+                            mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
+                        });
+                    }
+                });
+                // Delay app activation slightly to let animation be visible
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
                     this._activateApp(app);
-                    return Clutter.EVENT_STOP;
-                }
-                return Clutter.EVENT_PROPAGATE;
+                    return GLib.SOURCE_REMOVE;
+                });
             });
+            icon.add_action(clickAction);
 
             // Tooltip logic (use enter/leave for reliability)
             icon.connect('enter-event', () => {
