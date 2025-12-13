@@ -32,7 +32,8 @@ class DockView extends St.Widget {
             text: '',
             visible: false,
         });
-        Main.layoutManager.addChrome(this._tooltip);
+        // Add to uiGroup to ensure it floats above everything (including the dock)
+        Main.layoutManager.uiGroup.add_child(this._tooltip);
 
         // Container for icons
         this._grid = new St.Widget({
@@ -403,7 +404,8 @@ class DockView extends St.Widget {
         let tooltipY = Math.round(y + (h / 2) - (natH / 2));
 
         this._tooltip.set_position(tooltipX, tooltipY);
-        this._tooltip.set_z_position(9999); // Ensure on top
+        // Ensure on top of everything
+        this._tooltip.raise_top();
     }
 
     _hideTooltip() {
@@ -482,7 +484,7 @@ class DockView extends St.Widget {
 
     destroy() {
         if (this._tooltip) {
-            Main.layoutManager.removeChrome(this._tooltip);
+            Main.layoutManager.uiGroup.remove_child(this._tooltip);
             this._tooltip.destroy();
             this._tooltip = null;
         }
