@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.twocolumndock" path="/org/gnome/shell/extensions/twocolumndock/">
+    <key name="columns" type="i">
+      <default>2</default>
+      <summary>Number of columns</summary>
+      <description>The number of columns in the dock.</description>
+    </key>
+    <key name="icon-size" type="i">
+      <default>48</default>
+      <summary>Icon size</summary>
+      <description>The size of the application icons in pixels.</description>
+    </key>
+    <key name="background-color" type="s">
+      <default>'#1e1e1e'</default>
+      <summary>Background Color</summary>
+      <description>Hex color code for the dock background.</description>
+    </key>
+    <key name="background-opacity" type="d">
+      <default>0.95</default>
+      <summary>Background Opacity</summary>
+      <description>Opacity of the dock background (0.0 to 1.0).</description>
+    </key>
+    <key name="corner-radius" type="i">
+      <default>0</default>
+      <summary>Corner Radius</summary>
+      <description>Corner radius of the dock background.</description>
+    </key>
+    <key name="show-on-all-monitors" type="b">
+      <default>false</default>
+      <summary>Show on all monitors</summary>
+      <description>If true, the dock will be shown on all connected monitors.</description>
+    </key>
+  </schema>
+</schemalist>

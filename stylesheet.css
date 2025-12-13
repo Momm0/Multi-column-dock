@@ -1,0 +1,60 @@
+.two-column-dock-container {
+    background-color: transparent; /* Handled in vfunc_paint */
+    border-radius: 0;
+}
+
+/* Aggressively target the app icon button to remove backgrounds */
+.two-column-dock-container .app-well-app,
+.two-column-dock-container .app-well-app.running,
+.two-column-dock-container .app-well-app:selected,
+.two-column-dock-container .show-apps,
+.two-column-dock-container StButton {
+    background-color: transparent;
+    background-image: none;
+    background-gradient-direction: none;
+    box-shadow: none;
+    border: none;
+    margin: 0;
+    padding: 0;
+    text-shadow: none;
+    icon-shadow: none;
+}
+
+/* Restore hover effect */
+.two-column-dock-container .app-well-app:hover,
+.two-column-dock-container .app-well-app:focus,
+.two-column-dock-container StButton:hover,
+.two-column-dock-container StButton:focus {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border-radius: 8px !important;
+    transition-duration: 200ms;
+}
+
+.dock-show-apps {
+    padding: 0;
+    margin: 6px auto 0 auto;
+    border: none;
+    box-shadow: none;
+}
+
+.dock-scrollview {
+    padding: 0;
+    margin: 0;
+}
+
+/* Ensure icons are centered */
+.two-column-dock-container .overview-icon {
+    padding: 0;
+}
+
+/* Tooltip */
+.dock-tooltip {
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
+    border-radius: 6px;
+    padding: 6px 10px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 14px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}

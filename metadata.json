@@ -1,0 +1,13 @@
+{
+  "name": "Multi-Column Dock",
+  "description": "A novel multi-column dock for GNOME Shell.",
+  "uuid": "multi-column-dock@ali.example.com",
+  "shell-version": [
+    "45",
+    "46",
+    "47"
+  ],
+  "url": "",
+  "settings-schema": "org.gnome.shell.extensions.twocolumndock",
+  "version": 1
+}
