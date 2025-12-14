@@ -31,5 +31,30 @@
       <summary>Show on all monitors</summary>
       <description>If true, the dock will be shown on all connected monitors.</description>
     </key>
+    <key name="app-groups" type="s">
+      <default>'[]'</default>
+      <summary>Application Groups</summary>
+      <description>JSON array of app groups. Each group has: id, name, color, borderColor, borderWidth, opacity, collapsed, apps (array of app IDs).</description>
+    </key>
+    <key name="enable-groups" type="b">
+      <default>false</default>
+      <summary>Enable Groups</summary>
+      <description>If true, applications will be organized into custom groups.</description>
+    </key>
+    <key name="group-header-size" type="i">
+      <default>24</default>
+      <summary>Group Header Size</summary>
+      <description>Height of group header labels in pixels.</description>
+    </key>
+    <key name="group-spacing" type="i">
+      <default>8</default>
+      <summary>Group Spacing</summary>
+      <description>Spacing between groups in pixels.</description>
+    </key>
+    <key name="show-ungrouped" type="b">
+      <default>true</default>
+      <summary>Show Ungrouped Apps</summary>
+      <description>If true, apps not assigned to any group will be shown in an "Other" section.</description>
+    </key>
   </schema>
 </schemalist>

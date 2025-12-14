@@ -122,209 +122,6 @@ class BadgeManager {
 // Global badge manager instance
 let badgeManager = null;
 
-// Helper to parse hex color
-function parseHexColor(hex) {
-    let r = 30, g = 30, b = 30;
-    if (hex && hex.match(/^#[0-9a-fA-F]{6}$/)) {
-        r = parseInt(hex.substring(1, 3), 16);
-        g = parseInt(hex.substring(3, 5), 16);
-        b = parseInt(hex.substring(5, 7), 16);
-    }
-    return { r, g, b };
-}
-
-// Group Container Widget - Visual container for a group of apps
-const GroupContainer = GObject.registerClass(
-class GroupContainer extends St.BoxLayout {
-    _init(group, settings, dockView) {
-        super._init({
-            vertical: true,
-            style_class: 'dock-group-container',
-            x_expand: true,
-            y_expand: false,
-            reactive: true,
-        });
-
-        this._group = group;
-        this._settings = settings;
-        this._dockView = dockView;
-        this._collapsed = group.collapsed || false;
-        
-        // Enable DND
-        this._delegate = this;
-
-        // Create header (clickable to collapse/expand)
-        this._header = new St.BoxLayout({
-            style_class: 'dock-group-header',
-            reactive: true,
-            track_hover: true,
-            x_expand: true,
-        });
-
-        // Collapse/expand indicator
-        this._collapseIcon = new St.Icon({
-            icon_name: this._collapsed ? 'pan-end-symbolic' : 'pan-down-symbolic',
-            style_class: 'dock-group-collapse-icon',
-            icon_size: 12,
-        });
-        this._header.add_child(this._collapseIcon);
-
-        // Group name label
-        this._label = new St.Label({
-            text: group.name || 'Unnamed Group',
-            style_class: 'dock-group-label',
-            x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        this._header.add_child(this._label);
-
-        // Header click handler
-        this._header.connect('button-press-event', (actor, event) => {
-            if (event.get_button() === 1) {
-                this._toggleCollapse();
-                return Clutter.EVENT_STOP;
-            }
-            return Clutter.EVENT_PROPAGATE;
-        });
-
-        this.add_child(this._header);
-
-        // Grid for icons (inside a container for the group background)
-        this._contentBox = new St.BoxLayout({
-            vertical: true,
-            style_class: 'dock-group-content',
-            x_expand: true,
-        });
-
-        this._grid = new St.Widget({
-            layout_manager: new Clutter.GridLayout({
-                orientation: Clutter.Orientation.HORIZONTAL,
-                column_spacing: 0,
-                row_spacing: 0,
-            }),
-            style_class: 'dock-group-grid',
-            x_expand: true,
-        });
-        this._grid.set_x_align(Clutter.ActorAlign.START);
-        this._grid.set_y_align(Clutter.ActorAlign.START);
-
-        this._contentBox.add_child(this._grid);
-        this.add_child(this._contentBox);
-
-        // Apply group styling
-        this._updateGroupStyle();
-
-        // Initial collapse state
-        if (this._collapsed) {
-            this._contentBox.hide();
-        }
-    }
-
-    _updateGroupStyle() {
-        const group = this._group;
-        const { r, g, b } = parseHexColor(group.color || '#2a2a2a');
-        const opacity = group.opacity !== undefined ? group.opacity : 0.8;
-        const borderColor = parseHexColor(group.borderColor || '#444444');
-        const borderWidth = group.borderWidth !== undefined ? group.borderWidth : 1;
-        const headerSize = this._settings.get_int('group-header-size');
-
-        // Style the container with background and border
-        // Use margin-right to ensure border is visible
-        this.set_style(`
-            background-color: rgba(${r}, ${g}, ${b}, ${opacity});
-            border: ${borderWidth}px solid rgba(${borderColor.r}, ${borderColor.g}, ${borderColor.b}, 0.8);
-            border-radius: 8px;
-            margin: 2px 6px 2px 4px;
-            padding: 0;
-        `);
-
-        // Style the header
-        this._header.set_style(`
-            padding: 4px 8px;
-            min-height: ${headerSize}px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        `);
-
-        // Style the label with group color hint
-        this._label.set_style(`
-            font-weight: bold;
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.9);
-        `);
-    }
-
-    _toggleCollapse() {
-        this._collapsed = !this._collapsed;
-        this._group.collapsed = this._collapsed;
-        
-        // Update icon
-        this._collapseIcon.set_icon_name(
-            this._collapsed ? 'pan-end-symbolic' : 'pan-down-symbolic'
-        );
-
-        // Animate show/hide
-        if (this._collapsed) {
-            this._contentBox.ease({
-                opacity: 0,
-                duration: 150,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => {
-                    this._contentBox.hide();
-                }
-            });
-        } else {
-            this._contentBox.show();
-            this._contentBox.opacity = 0;
-            this._contentBox.ease({
-                opacity: 255,
-                duration: 150,
-                mode: Clutter.AnimationMode.EASE_IN_QUAD,
-            });
-        }
-
-        // Save collapse state
-        this._dockView._saveGroupState();
-    }
-
-    getGrid() {
-        return this._grid;
-    }
-
-    getGroup() {
-        return this._group;
-    }
-
-    isCollapsed() {
-        return this._collapsed;
-    }
-
-    // DND support for dropping apps into this group
-    handleDragOver(source, actor, x, y, time) {
-        if (source instanceof AppIcon) {
-            this.add_style_class_name('dock-group-drop-target');
-            return DND.DragMotionResult.MOVE_DROP;
-        }
-        return DND.DragMotionResult.NO_DROP;
-    }
-
-    acceptDrop(source, actor, x, y, time) {
-        this.remove_style_class_name('dock-group-drop-target');
-        
-        if (source instanceof AppIcon) {
-            let app = source.app;
-            if (!app) return false;
-            
-            let appId = app.get_id();
-            
-            // Add app to this group
-            this._dockView._moveAppToGroup(appId, this._group.id);
-            
-            return true;
-        }
-        return false;
-    }
-});
-
 const DockView = GObject.registerClass(
 class DockView extends St.Widget {
     _init(settings, monitorIndex) {
@@ -338,8 +135,6 @@ class DockView extends St.Widget {
         this._monitorIndex = monitorIndex;
         this._appSystem = Shell.AppSystem.get_default();
         this._appFavorites = AppFavorites.getAppFavorites();
-        this._groups = [];
-        this._groupContainers = new Map();
         
         // Enable Drag and Drop
         this._delegate = this;
@@ -353,15 +148,7 @@ class DockView extends St.Widget {
         // Add to uiGroup to ensure it floats above everything (including the dock)
         Main.layoutManager.uiGroup.add_child(this._tooltip);
 
-        // Main container for groups and ungrouped apps
-        this._mainContainer = new St.BoxLayout({
-            vertical: true,
-            x_expand: true,
-            y_expand: false,
-            style_class: 'dock-main-container',
-        });
-
-        // Container for icons (legacy mode without groups)
+        // Container for icons
         this._grid = new St.Widget({
             layout_manager: new Clutter.GridLayout({
                 orientation: Clutter.Orientation.HORIZONTAL,
@@ -371,22 +158,24 @@ class DockView extends St.Widget {
             style_class: 'dock-grid',
         });
 
-        // Anchor the grid to the top-left
+        // Anchor the grid to the top-left; prevent it from expanding
+        // (If it expands to full height, the icon cluster can appear centered.)
         this._grid.set_x_align(Clutter.ActorAlign.START);
         this._grid.set_y_align(Clutter.ActorAlign.START);
         this._grid.set_x_expand(false);
         this._grid.set_y_expand(false);
+        
+        // Add some padding/styling
+        // Removed background-color from here to apply custom styling
         this._grid.set_style('padding: 2px;');
 
-        this._mainContainer.add_child(this._grid);
-
-        // Container for the content inside ScrollView
+        // Container for the grid inside ScrollView (BoxLayout is more compatible)
         this._scrollContent = new St.BoxLayout({
             vertical: true,
             x_expand: true,
             y_expand: false,
         });
-        this._scrollContent.add_child(this._mainContainer);
+        this._scrollContent.add_child(this._grid);
 
         // ScrollView to enable scrolling when there are many apps
         this._scrollView = new St.ScrollView({
@@ -401,7 +190,7 @@ class DockView extends St.Widget {
 
         this.add_child(this._scrollView);
 
-        // Show Apps button
+        // Show Apps button (sits at the bottom of the screen)
         this._showAppsIcon = new St.Icon({
             icon_name: 'view-app-grid-symbolic',
             style_class: 'dock-show-apps-icon',
@@ -418,6 +207,8 @@ class DockView extends St.Widget {
 
         this._showAppsClickedId = this._showAppsButton.connect('clicked', () => {
             if (Main.overview.visible) {
+                // If overview is visible, check if we are already in the apps view
+                // We can check the dash's showAppsButton state if available
                 let dash = Main.overview.dash;
                 let inAppGrid = false;
                 
@@ -429,9 +220,16 @@ class DockView extends St.Widget {
                     }
                 }
                 
+                // If we are in app grid, close to desktop
                 if (inAppGrid) {
                     Main.overview.hide();
                 } else {
+                    // If we are in window picker (or unknown), switch to apps
+                    // But if we can't detect, we might just hide. 
+                    // Let's assume if visible, we want to toggle OFF if we are likely in apps.
+                    // If we are in window picker, showApps() usually switches to apps.
+                    
+                    // Try to switch to apps
                     if (Main.overview.showApps) {
                         Main.overview.showApps();
                     } else if (Main.overview.dash && Main.overview.dash.showApps) {
@@ -439,8 +237,13 @@ class DockView extends St.Widget {
                     } else {
                         Main.overview.hide();
                     }
+                    
+                    // If we were already in app grid and detection failed, showApps() might do nothing.
+                    // In that case, we should have hidden. 
+                    // But without reliable detection, this is the best effort.
                 }
             } else {
+                // Not visible, show apps
                 if (Main.overview.showApps) {
                     Main.overview.showApps();
                 } else if (Main.overview.dash && Main.overview.dash.showApps) {
@@ -466,7 +269,7 @@ class DockView extends St.Widget {
 
         this.add_child(this._showAppsButton);
 
-        // Position on screen
+        // Position on screen (Left side, below top panel)
         const monitor = Main.layoutManager.primaryMonitor;
         const panelHeight = Main.panel.height;
         
@@ -474,79 +277,26 @@ class DockView extends St.Widget {
         this.set_height(monitor.height - panelHeight); 
 
         // Badge tracking
-        this._iconBadges = new Map();
+        this._iconBadges = new Map(); // appId -> { icon, badge }
         this._badgeListener = this._onBadgeUpdate.bind(this);
         if (badgeManager) {
             badgeManager.addListener(this._badgeListener);
         }
 
-        // Load groups from settings
-        this._loadGroups();
-
         // Connect settings
-        this._settingsChangedId = this._settings.connect('changed', this._onSettingsChanged.bind(this));
+        this._settingsChangedId = this._settings.connect('changed', this._redisplay.bind(this));
         this._favoritesChangedId = this._appFavorites.connect('changed', this._redisplay.bind(this));
         this._appStateChangedId = this._appSystem.connect('app-state-changed', this._redisplay.bind(this));
         this._installedChangedId = this._appSystem.connect('installed-changed', this._redisplay.bind(this));
         
         this.connect('destroy', this._onDestroy.bind(this));
+        
+        // Connect style settings
+        this._settings.connect('changed::background-color', this._updateStyle.bind(this));
+        this._settings.connect('changed::background-opacity', this._updateStyle.bind(this));
+        this._settings.connect('changed::corner-radius', this._updateStyle.bind(this));
 
         this._updateStyle();
-        this._redisplay();
-    }
-
-    _onSettingsChanged(settings, key) {
-        if (key === 'app-groups' || key === 'enable-groups' || key === 'show-ungrouped') {
-            this._loadGroups();
-        }
-        this._redisplay();
-        
-        if (key === 'background-color' || key === 'background-opacity' || key === 'corner-radius') {
-            this._updateStyle();
-        }
-    }
-
-    _loadGroups() {
-        try {
-            let groupsJson = this._settings.get_string('app-groups');
-            this._groups = JSON.parse(groupsJson) || [];
-        } catch (e) {
-            log(`[Multi-Column Dock] Error loading groups: ${e.message}`);
-            this._groups = [];
-        }
-    }
-
-    _saveGroups() {
-        try {
-            this._settings.set_string('app-groups', JSON.stringify(this._groups));
-        } catch (e) {
-            log(`[Multi-Column Dock] Error saving groups: ${e.message}`);
-        }
-    }
-
-    _saveGroupState() {
-        // Save collapse states
-        this._saveGroups();
-    }
-
-    _moveAppToGroup(appId, groupId) {
-        // Remove app from all groups first
-        for (let group of this._groups) {
-            if (group.apps) {
-                group.apps = group.apps.filter(id => id !== appId);
-            }
-        }
-
-        // Add to target group (if not 'ungrouped')
-        if (groupId !== 'ungrouped') {
-            let targetGroup = this._groups.find(g => g.id === groupId);
-            if (targetGroup) {
-                if (!targetGroup.apps) targetGroup.apps = [];
-                targetGroup.apps.push(appId);
-            }
-        }
-
-        this._saveGroups();
         this._redisplay();
     }
 
@@ -555,7 +305,13 @@ class DockView extends St.Widget {
         let opacity = this._settings.get_double('background-opacity');
         let radius = this._settings.get_int('corner-radius');
 
-        const { r, g, b } = parseHexColor(hex);
+        // Basic hex parsing
+        let r = 30, g = 30, b = 30; // Default fallback
+        if (hex && hex.match(/^#[0-9a-fA-F]{6}$/)) {
+            r = parseInt(hex.substring(1, 3), 16);
+            g = parseInt(hex.substring(3, 5), 16);
+            b = parseInt(hex.substring(5, 7), 16);
+        }
 
         this.set_style(`
             background-color: rgba(${r}, ${g}, ${b}, ${opacity});
@@ -564,6 +320,7 @@ class DockView extends St.Widget {
     }
 
     _onDestroy() {
+        // Remove badge listener
         if (badgeManager && this._badgeListener) {
             badgeManager.removeListener(this._badgeListener);
         }
@@ -592,6 +349,7 @@ class DockView extends St.Widget {
     }
 
     _onBadgeUpdate(appId) {
+        // Update badge for specific app if we have it
         let entry = this._iconBadges.get(appId);
         if (entry) {
             this._updateBadge(entry.icon, entry.badge, appId);
@@ -606,6 +364,7 @@ class DockView extends St.Widget {
             badge.set_text(text);
             badge.show();
             
+            // Add urgent styling if needed
             if (badgeInfo.urgent) {
                 badge.add_style_class_name('dock-badge-urgent');
             } else {
@@ -630,50 +389,56 @@ class DockView extends St.Widget {
 
     _redisplay() {
         // Clear existing children
-        this._mainContainer.destroy_all_children();
-        this._groupContainers.clear();
+        this._grid.destroy_all_children();
         this._iconBadges.clear();
 
         const columns = this._settings.get_int('columns');
         const iconSize = this._settings.get_int('icon-size');
-        const enableGroups = this._settings.get_boolean('enable-groups');
-        const showUngrouped = this._settings.get_boolean('show-ungrouped');
-        const groupSpacing = this._settings.get_int('group-spacing');
         
-        // Get app lists
+        // 1. Get lists
         const favorites = this._appFavorites.getFavorites();
         const running = this._appSystem.get_running();
 
+        // 2. Merge and Deduplicate
+        // Use app ID for deduplication as object references might differ
         const seenIds = new Set();
-        const allApps = [];
+        const apps = [];
 
+        // Add favorites first
         favorites.forEach(app => {
             let id = app.get_id();
             if (!seenIds.has(id)) {
-                allApps.push(app);
+                apps.push(app);
                 seenIds.add(id);
             }
         });
 
+        // Add running apps not in favorites
         running.forEach(app => {
             let id = app.get_id();
             if (!seenIds.has(id)) {
-                allApps.push(app);
+                apps.push(app);
                 seenIds.add(id);
             }
         });
 
-        // Calculate dimensions
+        const layout = this._grid.layout_manager;
+        
+        // Reset layout
+        layout.set_column_homogeneous(true);
+        layout.set_row_homogeneous(true);
+
+        // Calculate and set fixed width for the dock to ensure compact square icons
+        // iconSize is the inner icon size. The button usually adds padding.
+        // Standard app icon padding is often around 12px total (6px each side)
         const itemPadding = 12; 
         const totalIconSize = iconSize + itemPadding;
-        const dockPadding = 4;
-        // Add extra width for group borders and margins when groups are enabled
-        const groupMargin = enableGroups ? 16 : 0;
-        const totalWidth = (totalIconSize * columns) + (dockPadding * 2) + groupMargin;
+        const dockPadding = 4; // Container padding
+        const totalWidth = (totalIconSize * columns) + (dockPadding * 2);
         
         this.set_width(totalWidth);
 
-        // Size Show Apps button
+        // Size and style the Show Apps button to match icons
         if (this._showAppsButton) {
             this._showAppsButton.set_size(totalIconSize, totalIconSize);
             this._showAppsButton.set_style('border: none; box-shadow: none; padding: 6px; margin: 6px auto 8px auto;');
@@ -682,41 +447,133 @@ class DockView extends St.Widget {
             this._showAppsIcon.set_icon_size(iconSize);
         }
 
-        if (enableGroups && this._groups.length > 0) {
-            // GROUP MODE: Render apps organized by groups
-            this._renderGroupedApps(allApps, columns, iconSize, totalIconSize, showUngrouped, groupSpacing);
-        } else {
-            // LEGACY MODE: Render apps in a simple grid
-            this._renderSimpleGrid(allApps, columns, iconSize, totalIconSize);
-        }
-
-        this.add_style_class_name('two-column-dock-container');
-        this.queue_relayout();
-    }
-
-    _renderSimpleGrid(apps, columns, iconSize, totalIconSize) {
-        // Create the legacy grid
-        this._grid = new St.Widget({
-            layout_manager: new Clutter.GridLayout({
-                orientation: Clutter.Orientation.HORIZONTAL,
-                column_spacing: 0,
-                row_spacing: 0,
-            }),
-            style_class: 'dock-grid',
-        });
-        this._grid.set_x_align(Clutter.ActorAlign.START);
-        this._grid.set_y_align(Clutter.ActorAlign.START);
-        this._grid.set_style('padding: 2px;');
-
-        const layout = this._grid.layout_manager;
-        layout.set_column_homogeneous(true);
-        layout.set_row_homogeneous(true);
-
         let col = 0;
         let row = 0;
 
         apps.forEach(app => {
-            let icon = this._createAppIcon(app, iconSize, totalIconSize);
+            let icon = new AppIcon(app, {
+                setSizeManually: true,
+                showLabel: false,
+            });
+            
+            // Set size on the internal BaseIcon
+            if (icon.icon && typeof icon.icon.setIconSize === 'function') {
+                icon.icon.setIconSize(iconSize);
+            }
+
+            // Force transparency and remove default styling on the button
+            // We allow hover via CSS now, so we don't force background-color: transparent in inline style
+            icon.set_style('border: none; box-shadow: none; padding: 6px; margin: 0;');
+            
+            // Force the icon widget to be square
+            icon.set_size(totalIconSize, totalIconSize);
+            icon.set_x_align(Clutter.ActorAlign.CENTER);
+            icon.set_y_align(Clutter.ActorAlign.CENTER);
+
+            // Set pivot point for animation (center of the icon)
+            icon.set_pivot_point(0.5, 0.5);
+
+            // Track drag state and click timing to distinguish clicks from drags
+            let dragStarted = false;
+            let pressTime = 0;
+            let pressX = 0;
+            let pressY = 0;
+            
+            // Connect to the icon's internal drag actor if available
+            if (icon._draggable) {
+                icon._draggable.connect('drag-begin', () => {
+                    dragStarted = true;
+                });
+                icon._draggable.connect('drag-end', () => {
+                    // Keep dragStarted true briefly to prevent button-release from triggering
+                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+                        dragStarted = false;
+                        return GLib.SOURCE_REMOVE;
+                    });
+                });
+            }
+
+            // Track button press for click detection
+            icon.connect('button-press-event', (actor, event) => {
+                if (event.get_button() === 1) {
+                    pressTime = GLib.get_monotonic_time();
+                    [pressX, pressY] = event.get_coords();
+                }
+                return Clutter.EVENT_PROPAGATE;
+            });
+
+            // Use button-release-event for click animation (doesn't block drag-and-drop)
+            icon.connect('button-release-event', (actor, event) => {
+                if (event.get_button() !== 1) {
+                    return Clutter.EVENT_PROPAGATE;
+                }
+                
+                // Skip if drag occurred
+                if (dragStarted) {
+                    return Clutter.EVENT_PROPAGATE;
+                }
+                
+                // Check if this was a quick click (not a drag attempt)
+                let elapsed = GLib.get_monotonic_time() - pressTime;
+                let [releaseX, releaseY] = event.get_coords();
+                let distance = Math.sqrt(Math.pow(releaseX - pressX, 2) + Math.pow(releaseY - pressY, 2));
+                
+                // If held too long or moved too far, it was likely a drag attempt
+                if (elapsed > 300000 || distance > 10) { // 300ms or 10px
+                    return Clutter.EVENT_PROPAGATE;
+                }
+                
+                // Animate the icon: scale up then back to normal
+                icon.ease({
+                    scale_x: 1.3,
+                    scale_y: 1.3,
+                    duration: 80,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    onComplete: () => {
+                        icon.ease({
+                            scale_x: 1.0,
+                            scale_y: 1.0,
+                            duration: 120,
+                            mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
+                        });
+                    }
+                });
+                // Delay app activation slightly to let animation be visible
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+                    this._activateApp(app);
+                    return GLib.SOURCE_REMOVE;
+                });
+                return Clutter.EVENT_STOP;
+            });
+
+            // Tooltip logic (use enter/leave for reliability)
+            icon.connect('enter-event', () => {
+                this._showTooltip(icon, app.get_name());
+            });
+            icon.connect('leave-event', () => {
+                this._hideTooltip();
+            });
+            // Fallback for hover notify (some themes/actors may not emit enter-event)
+            icon.connect('notify::hover', () => {
+                if (icon.hover) {
+                    this._showTooltip(icon, app.get_name());
+                } else {
+                    this._hideTooltip();
+                }
+            });
+
+            // Create notification badge
+            let appId = app.get_id();
+            let badge = this._createBadge();
+            icon.add_child(badge);
+            
+            // Store reference for updates
+            this._iconBadges.set(appId, { icon, badge });
+            
+            // Initialize badge state
+            this._updateBadge(icon, badge, appId);
+
+            // Add to grid
             layout.attach(icon, col, row, 1, 1);
 
             col++;
@@ -725,224 +582,38 @@ class DockView extends St.Widget {
                 row++;
             }
         });
-
-        this._mainContainer.add_child(this._grid);
-    }
-
-    _renderGroupedApps(apps, columns, iconSize, totalIconSize, showUngrouped, groupSpacing) {
-        // Create a map of appId -> app for quick lookup
-        const appMap = new Map();
-        apps.forEach(app => appMap.set(app.get_id(), app));
-
-        // Track which apps are assigned to groups
-        const assignedApps = new Set();
-
-        // Render each group
-        for (let group of this._groups) {
-            let groupApps = [];
-            
-            if (group.apps && group.apps.length > 0) {
-                for (let appId of group.apps) {
-                    let app = appMap.get(appId);
-                    if (app) {
-                        groupApps.push(app);
-                        assignedApps.add(appId);
-                    }
-                }
-            }
-
-            // Only render group if it has apps or is explicitly shown
-            if (groupApps.length > 0 || group.showEmpty) {
-                let groupContainer = new GroupContainer(group, this._settings, this);
-                this._groupContainers.set(group.id, groupContainer);
-
-                // Add spacing between groups
-                groupContainer.set_style(groupContainer.get_style() + ` margin-bottom: ${groupSpacing}px;`);
-
-                // Populate the group's grid
-                if (!groupContainer.isCollapsed()) {
-                    let grid = groupContainer.getGrid();
-                    let layout = grid.layout_manager;
-                    layout.set_column_homogeneous(true);
-                    layout.set_row_homogeneous(true);
-
-                    let col = 0;
-                    let row = 0;
-
-                    groupApps.forEach(app => {
-                        let icon = this._createAppIcon(app, iconSize, totalIconSize);
-                        layout.attach(icon, col, row, 1, 1);
-
-                        col++;
-                        if (col >= columns) {
-                            col = 0;
-                            row++;
-                        }
-                    });
-                }
-
-                this._mainContainer.add_child(groupContainer);
-            }
-        }
-
-        // Render ungrouped apps (if enabled)
-        if (showUngrouped) {
-            let ungroupedApps = apps.filter(app => !assignedApps.has(app.get_id()));
-            
-            if (ungroupedApps.length > 0) {
-                // Create an "Other" group container
-                let otherGroup = {
-                    id: 'ungrouped',
-                    name: 'Other',
-                    color: '#333333',
-                    borderColor: '#555555',
-                    borderWidth: 1,
-                    opacity: 0.6,
-                    collapsed: false,
-                };
-
-                let groupContainer = new GroupContainer(otherGroup, this._settings, this);
-                this._groupContainers.set('ungrouped', groupContainer);
-
-                let grid = groupContainer.getGrid();
-                let layout = grid.layout_manager;
-                layout.set_column_homogeneous(true);
-                layout.set_row_homogeneous(true);
-
-                let col = 0;
-                let row = 0;
-
-                ungroupedApps.forEach(app => {
-                    let icon = this._createAppIcon(app, iconSize, totalIconSize);
-                    layout.attach(icon, col, row, 1, 1);
-
-                    col++;
-                    if (col >= columns) {
-                        col = 0;
-                        row++;
-                    }
-                });
-
-                this._mainContainer.add_child(groupContainer);
-            }
-        }
-    }
-
-    _createAppIcon(app, iconSize, totalIconSize) {
-        let icon = new AppIcon(app, {
-            setSizeManually: true,
-            showLabel: false,
-        });
         
-        if (icon.icon && typeof icon.icon.setIconSize === 'function') {
-            icon.icon.setIconSize(iconSize);
-        }
-
-        icon.set_style('border: none; box-shadow: none; padding: 6px; margin: 0;');
-        icon.set_size(totalIconSize, totalIconSize);
-        icon.set_x_align(Clutter.ActorAlign.CENTER);
-        icon.set_y_align(Clutter.ActorAlign.CENTER);
-        icon.set_pivot_point(0.5, 0.5);
-
-        // Drag state tracking
-        let dragStarted = false;
-        let pressTime = 0;
-        let pressX = 0;
-        let pressY = 0;
+        // Add a separator line between columns if we have more than 1 column
+        // This is tricky with GridLayout. We might need to use CSS border on the items or a background image.
+        // A simpler way is to style the grid to have a gap and a background that looks like a separator.
+        // Or we can add a St.Widget as a separator line in the layout, but that messes up the grid indexing.
         
-        if (icon._draggable) {
-            icon._draggable.connect('drag-begin', () => {
-                dragStarted = true;
-            });
-            icon._draggable.connect('drag-end', () => {
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-                    dragStarted = false;
-                    return GLib.SOURCE_REMOVE;
-                });
-            });
-        }
-
-        icon.connect('button-press-event', (actor, event) => {
-            if (event.get_button() === 1) {
-                pressTime = GLib.get_monotonic_time();
-                [pressX, pressY] = event.get_coords();
-            }
-            return Clutter.EVENT_PROPAGATE;
-        });
-
-        icon.connect('button-release-event', (actor, event) => {
-            if (event.get_button() !== 1) {
-                return Clutter.EVENT_PROPAGATE;
-            }
-            
-            if (dragStarted) {
-                return Clutter.EVENT_PROPAGATE;
-            }
-            
-            let elapsed = GLib.get_monotonic_time() - pressTime;
-            let [releaseX, releaseY] = event.get_coords();
-            let distance = Math.sqrt(Math.pow(releaseX - pressX, 2) + Math.pow(releaseY - pressY, 2));
-            
-            if (elapsed > 300000 || distance > 10) {
-                return Clutter.EVENT_PROPAGATE;
-            }
-            
-            icon.ease({
-                scale_x: 1.3,
-                scale_y: 1.3,
-                duration: 80,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => {
-                    icon.ease({
-                        scale_x: 1.0,
-                        scale_y: 1.0,
-                        duration: 120,
-                        mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
-                    });
-                }
-            });
-            
-            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
-                this._activateApp(app);
-                return GLib.SOURCE_REMOVE;
-            });
-            return Clutter.EVENT_STOP;
-        });
-
-        // Tooltip
-        icon.connect('enter-event', () => {
-            this._showTooltip(icon, app.get_name());
-        });
-        icon.connect('leave-event', () => {
-            this._hideTooltip();
-        });
-        icon.connect('notify::hover', () => {
-            if (icon.hover) {
-                this._showTooltip(icon, app.get_name());
-            } else {
-                this._hideTooltip();
-            }
-        });
-
-        // Badge
-        let appId = app.get_id();
-        let badge = this._createBadge();
-        icon.add_child(badge);
-        this._iconBadges.set(appId, { icon, badge });
-        this._updateBadge(icon, badge, appId);
-
-        return icon;
+        // Let's try CSS styling for the separator look.
+        // We will add a style class to the dock container.
+        this.add_style_class_name('two-column-dock-container');
+        
+        // Adjust width based on columns and icon size
+        // Simple estimation: iconSize * columns + padding
+        // Ideally we let the layout handle it, but for a dock we might want fixed width
+        
+        // Force a redraw of the separator if we implement it via drawing
+        this.queue_relayout();
     }
+
+    // (Removed duplicate _redisplay() implementation)
 
     _activateApp(app) {
+        // Get all windows for this app
         let windows = app.get_windows();
         
         if (windows.length === 0) {
+            // No windows, open a new one
             app.open_new_window(-1);
             Main.overview.hide();
             return;
         }
 
+        // Find the most recently used window
         let workspace = global.workspace_manager.get_active_workspace();
         let currentWindows = windows.filter(w => !w.skip_taskbar);
         
@@ -952,15 +623,20 @@ class DockView extends St.Widget {
             return;
         }
 
+        // Sort windows by user time (most recent first)
         currentWindows.sort((a, b) => b.get_user_time() - a.get_user_time());
         let mostRecentWindow = currentWindows[0];
 
+        // Check if the window is minimized
         if (mostRecentWindow.minimized) {
+            // Unminimize and activate the window
             mostRecentWindow.unminimize();
             mostRecentWindow.activate(global.get_current_time());
         } else if (mostRecentWindow.has_focus()) {
+            // If focused, minimize it
             mostRecentWindow.minimize();
         } else {
+            // Otherwise, just activate it
             mostRecentWindow.activate(global.get_current_time());
         }
         
@@ -971,12 +647,15 @@ class DockView extends St.Widget {
         this._tooltip.set_text(text);
         this._tooltip.show();
 
+        // Ensure size is calculated
         const [, natW] = this._tooltip.get_preferred_width(-1);
         const [, natH] = this._tooltip.get_preferred_height(-1);
 
+        // Get absolute coordinates of the icon
         let [x, y] = actor.get_transformed_position();
         let [w, h] = actor.get_transformed_size();
         
+        // Position to the right of the icon
         let tooltipX = Math.round(x + w + 10);
         let tooltipY = Math.round(y + (h / 2) - (natH / 2));
 
@@ -989,26 +668,29 @@ class DockView extends St.Widget {
 
     vfunc_allocate(box) {
         super.vfunc_allocate(box);
+        // Custom drawing for the separator line could go here or in vfunc_paint
     }
 
     vfunc_paint(paintContext) {
+        // Chain up first to paint background (from CSS/set_style) and children
         super.vfunc_paint(paintContext);
 
         let width = this.get_width();
         let height = this.get_height();
         let columns = this._settings.get_int('columns');
-        let enableGroups = this._settings.get_boolean('enable-groups');
 
-        // Only draw column separators in non-grouped mode
-        if (!enableGroups && columns >= 2) {
+        // Draw separator line between columns
+        if (columns >= 2) {
             let cr = paintContext.get_cairo_context();
             let colWidth = width / columns;
             
+            // Draw a subtle separator line
             cr.setSourceRGBA(1, 1, 1, 0.15); 
             cr.setLineWidth(1);
             
             for (let i = 1; i < columns; i++) {
                 let x = Math.floor(colWidth * i);
+                // Draw line
                 cr.moveTo(x, 0);
                 cr.lineTo(x, height);
                 cr.stroke();
@@ -1030,6 +712,7 @@ class DockView extends St.Widget {
             
             let id = app.get_id();
             
+            // Calculate index
             const columns = this._settings.get_int('columns');
             const iconSize = this._settings.get_int('icon-size');
             const itemPadding = 12; 
@@ -1038,12 +721,14 @@ class DockView extends St.Widget {
             let col = Math.floor(x / totalIconSize);
             let row = Math.floor(y / totalIconSize);
             
+            // Clamp col
             if (col >= columns) col = columns - 1;
             if (col < 0) col = 0;
             if (row < 0) row = 0;
             
             let index = row * columns + col;
             
+            // Move it
             AppFavorites.getAppFavorites().moveFavoriteToPos(id, index);
             
             return true;
@@ -1072,27 +757,53 @@ export default class TwoColumnDockExtension extends Extension {
         this._settings = this.getSettings();
         this._docks = [];
         
-        // Initialize badge manager
+        // Initialize badge manager for notification counts
         badgeManager = new BadgeManager();
         
         this._createDocks();
         
+        // Monitor changes to update position if resolution changes
         this._monitorsChangedId = Main.layoutManager.connect('monitors-changed', this._createDocks.bind(this));
         this._settings.connect('changed::show-on-all-monitors', this._createDocks.bind(this));
 
-        // Hide original dash
+        // Hide original dash (simple hack)
+        // Note: This might conflict if Ubuntu Dock is very aggressive, but standard Dash will hide.
         this._originalDash = Main.overview.dash;
         if (this._originalDash) {
              this._originalDash.hide();
+             // Also try to hide the parent container if it's the Ubuntu Dock
              if (this._originalDash.get_parent() && this._originalDash.get_parent().has_style_class_name('dock-container')) {
                  this._originalDash.get_parent().hide();
              }
         }
 
-        // Global key handler for Escape in app grid
+        // Monkey-patch the overview to skip the window picker when pressing Escape from the app grid
+        // This is a bit invasive but necessary to change the Escape behavior
+        this._originalShowApps = Main.overview.showApps;
+        this._originalHide = Main.overview.hide;
+        
+        // We can try to intercept the 'hiding' signal or modify the view selector behavior if possible.
+        // A safer approach for "Escape" specifically is to look at how the view selector handles it.
+        // In GNOME 40+, the Overview controls the state transition.
+        
+        // Let's try to inject a key press handler or modify the state adjustment?
+        // Actually, the simplest way might be to just listen to the 'hidden' signal of the app grid?
+        // No, that's too late.
+        
+        // Let's try to override the 'hide' method of the overview to force a full exit if we are in app grid?
+        // But 'hide' is called when we want to exit completely.
+        
+        // The issue is that Escape in App Grid triggers "showWindowPicker" (or similar) instead of "hide".
+        // We need to find where that transition happens.
+        // It is usually in `js/ui/overview.js` or `js/ui/viewSelector.js` (older) or `js/ui/overviewControls.js`.
+        
+        // Since we can't easily patch core files safely across versions, let's try a global key listener
+        // that intercepts Escape when the overview is visible and in App Grid mode.
+        
         this._globalKeyPressId = global.stage.connect('key-press-event', (actor, event) => {
             const symbol = event.get_key_symbol();
             if (symbol === Clutter.KEY_Escape && Main.overview.visible) {
+                // Check if we are in App Grid
                 let dash = Main.overview.dash;
                 let inAppGrid = false;
                 if (dash) {
@@ -1101,6 +812,7 @@ export default class TwoColumnDockExtension extends Extension {
                 }
                 
                 if (inAppGrid) {
+                    // Force close overview completely
                     Main.overview.hide();
                     return Clutter.EVENT_STOP;
                 }
@@ -1110,6 +822,7 @@ export default class TwoColumnDockExtension extends Extension {
     }
 
     _createDocks() {
+        // Destroy existing docks
         if (this._docks) {
             this._docks.forEach(dock => {
                 Main.layoutManager.removeChrome(dock);
@@ -1122,6 +835,7 @@ export default class TwoColumnDockExtension extends Extension {
         let monitors = Main.layoutManager.monitors;
 
         monitors.forEach((monitor, index) => {
+            // If not showing on all, only show on primary
             if (!showOnAll && index !== Main.layoutManager.primaryIndex) return;
 
             let dock = new DockView(this._settings, index);
@@ -1138,6 +852,14 @@ export default class TwoColumnDockExtension extends Extension {
     }
 
     _updateDockPosition(dock, monitor) {
+        const panelHeight = Main.panel.height; // Assuming panel is on all monitors or just primary? 
+        // Main.panel is usually only on primary unless multi-monitor extension is used.
+        // But let's assume we want to avoid the top area regardless.
+        
+        // Check if this monitor has a panel? 
+        // For simplicity, we assume panel is at top of monitor 0.
+        // If monitor.y == 0, add panel height.
+        
         let yOffset = 0;
         if (monitor.index === Main.layoutManager.primaryIndex) {
             yOffset = Main.panel.height;
@@ -1145,6 +867,16 @@ export default class TwoColumnDockExtension extends Extension {
 
         dock.set_position(monitor.x, monitor.y + yOffset);
         dock.set_height(monitor.height - yOffset);
+        
+        // Anchor the grid to the top-left (child alignment, not layout alignment)
+        dock._grid.set_x_align(Clutter.ActorAlign.START);
+        dock._grid.set_y_align(Clutter.ActorAlign.START);
+        dock._grid.set_x_expand(false);
+        dock._grid.set_y_expand(false);
+    }
+
+    _updatePosition() {
+        // Deprecated, logic moved to _createDocks and _updateDockPosition
     }
 
     disable() {
@@ -1165,6 +897,7 @@ export default class TwoColumnDockExtension extends Extension {
             this._docks = [];
         }
         
+        // Cleanup badge manager
         if (badgeManager) {
             badgeManager.destroy();
             badgeManager = null;

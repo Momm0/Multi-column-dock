@@ -2,96 +2,616 @@ import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
 import Gdk from 'gi://Gdk';
+import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import { ExtensionPreferences } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+
+// Helper function to generate unique IDs
+function generateId() {
+    return 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Helper to create color button (compatible with GTK4)
+function createColorButton(initialHex) {
+    let colorButton;
+    try {
+        const dialog = new Gtk.ColorDialog();
+        colorButton = new Gtk.ColorDialogButton({ dialog });
+    } catch (e) {
+        colorButton = new Gtk.ColorButton();
+    }
+
+    const rgba = new Gdk.RGBA();
+    rgba.parse(initialHex || '#333333');
+    if (colorButton.set_rgba) {
+        colorButton.set_rgba(rgba);
+    } else {
+        colorButton.rgba = rgba;
+    }
+
+    return colorButton;
+}
+
+// Helper to get hex color from color button
+function getHexFromButton(colorButton) {
+    const c = colorButton.rgba;
+    return '#' +
+        Math.round(c.red * 255).toString(16).padStart(2, '0') +
+        Math.round(c.green * 255).toString(16).padStart(2, '0') +
+        Math.round(c.blue * 255).toString(16).padStart(2, '0');
+}
+
+// Group Editor Dialog
+const GroupEditorDialog = GObject.registerClass(
+class GroupEditorDialog extends Adw.Dialog {
+    _init(group, installedApps, onSave) {
+        super._init({
+            title: group ? 'Edit Group' : 'New Group',
+            content_width: 550,
+            content_height: 700,
+        });
+
+        this._group = group ? JSON.parse(JSON.stringify(group)) : {
+            id: generateId(),
+            name: '',
+            color: '#2a2a2a',
+            borderColor: '#444444',
+            borderWidth: 1,
+            opacity: 0.8,
+            apps: [],
+            collapsed: false,
+        };
+        this._installedApps = installedApps;
+        this._onSave = onSave;
+        this._selectedApps = new Set(this._group.apps || []);
+
+        this._buildUI();
+    }
+
+    _buildUI() {
+        // Header bar with Save/Cancel
+        const headerBar = new Adw.HeaderBar();
+        
+        const cancelBtn = new Gtk.Button({ label: 'Cancel' });
+        cancelBtn.connect('clicked', () => this.close());
+        headerBar.pack_start(cancelBtn);
+
+        const saveBtn = new Gtk.Button({ 
+            label: 'Save',
+            css_classes: ['suggested-action'],
+        });
+        saveBtn.connect('clicked', () => this._save());
+        headerBar.pack_end(saveBtn);
+
+        // Main content box
+        const mainBox = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 8,
+            margin_top: 8,
+            margin_bottom: 8,
+            margin_start: 12,
+            margin_end: 12,
+        });
+
+        // ===== Compact Settings Section =====
+        const settingsFrame = new Gtk.Frame({
+            label: 'Settings',
+        });
+        
+        const settingsGrid = new Gtk.Grid({
+            row_spacing: 6,
+            column_spacing: 12,
+            margin_top: 8,
+            margin_bottom: 8,
+            margin_start: 8,
+            margin_end: 8,
+        });
+
+        // Row 0: Name
+        settingsGrid.attach(new Gtk.Label({ label: 'Name:', halign: Gtk.Align.END }), 0, 0, 1, 1);
+        this._nameEntry = new Gtk.Entry({
+            text: this._group.name,
+            placeholder_text: 'e.g., AI Tools',
+            hexpand: true,
+        });
+        settingsGrid.attach(this._nameEntry, 1, 0, 3, 1);
+
+        // Row 1: Background Color, Border Color
+        settingsGrid.attach(new Gtk.Label({ label: 'Background:', halign: Gtk.Align.END }), 0, 1, 1, 1);
+        this._bgColorButton = createColorButton(this._group.color);
+        settingsGrid.attach(this._bgColorButton, 1, 1, 1, 1);
+
+        settingsGrid.attach(new Gtk.Label({ label: 'Border:', halign: Gtk.Align.END }), 2, 1, 1, 1);
+        this._borderColorButton = createColorButton(this._group.borderColor);
+        settingsGrid.attach(this._borderColorButton, 3, 1, 1, 1);
+
+        // Row 2: Border Width, Opacity
+        settingsGrid.attach(new Gtk.Label({ label: 'Border Width:', halign: Gtk.Align.END }), 0, 2, 1, 1);
+        this._borderWidthSpin = Gtk.SpinButton.new_with_range(0, 5, 1);
+        this._borderWidthSpin.set_value(this._group.borderWidth || 1);
+        settingsGrid.attach(this._borderWidthSpin, 1, 2, 1, 1);
+
+        settingsGrid.attach(new Gtk.Label({ label: 'Opacity:', halign: Gtk.Align.END }), 2, 2, 1, 1);
+        this._opacitySpin = Gtk.SpinButton.new_with_range(0.0, 1.0, 0.05);
+        this._opacitySpin.set_value(this._group.opacity !== undefined ? this._group.opacity : 0.8);
+        this._opacitySpin.set_digits(2);
+        settingsGrid.attach(this._opacitySpin, 3, 2, 1, 1);
+
+        settingsFrame.set_child(settingsGrid);
+        mainBox.append(settingsFrame);
+
+        // ===== Applications Section (takes remaining space) =====
+        const appsFrame = new Gtk.Frame({
+            label: 'Applications - Select apps for this group',
+            vexpand: true,
+        });
+
+        // App list with checkboxes
+        this._appListBox = new Gtk.ListBox({
+            selection_mode: Gtk.SelectionMode.NONE,
+            css_classes: ['boxed-list'],
+        });
+
+        // Sort apps alphabetically
+        const sortedApps = [...this._installedApps].sort((a, b) => 
+            a.name.localeCompare(b.name)
+        );
+
+        for (let appInfo of sortedApps) {
+            const row = new Gtk.Box({
+                orientation: Gtk.Orientation.HORIZONTAL,
+                spacing: 8,
+                margin_top: 4,
+                margin_bottom: 4,
+                margin_start: 8,
+                margin_end: 8,
+            });
+
+            // Checkbox first
+            const checkbox = new Gtk.CheckButton({
+                active: this._selectedApps.has(appInfo.id),
+            });
+            checkbox.connect('toggled', () => {
+                if (checkbox.get_active()) {
+                    this._selectedApps.add(appInfo.id);
+                } else {
+                    this._selectedApps.delete(appInfo.id);
+                }
+            });
+            row.append(checkbox);
+
+            // App icon
+            if (appInfo.icon) {
+                const icon = new Gtk.Image({
+                    gicon: appInfo.icon,
+                    pixel_size: 24,
+                });
+                row.append(icon);
+            }
+
+            // App name
+            const label = new Gtk.Label({
+                label: appInfo.name,
+                halign: Gtk.Align.START,
+                hexpand: true,
+            });
+            row.append(label);
+
+            this._appListBox.append(row);
+        }
+
+        // Scrollable app list
+        const appScroll = new Gtk.ScrolledWindow({
+            vexpand: true,
+            hexpand: true,
+            hscrollbar_policy: Gtk.PolicyType.NEVER,
+            vscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
+            margin_top: 4,
+            margin_bottom: 4,
+            margin_start: 4,
+            margin_end: 4,
+        });
+        appScroll.set_child(this._appListBox);
+        appsFrame.set_child(appScroll);
+        
+        mainBox.append(appsFrame);
+
+        // Set up the dialog structure
+        const toolbarView = new Adw.ToolbarView();
+        toolbarView.add_top_bar(headerBar);
+        toolbarView.set_content(mainBox);
+
+        this.set_child(toolbarView);
+
+        this.set_child(toolbarView);
+    }
+
+    _save() {
+        const name = this._nameEntry.get_text().trim();
+        if (!name) {
+            // Show error - name is required
+            this._nameEntry.add_css_class('error');
+            return;
+        }
+
+        this._group.name = name;
+        this._group.color = getHexFromButton(this._bgColorButton);
+        this._group.borderColor = getHexFromButton(this._borderColorButton);
+        this._group.borderWidth = this._borderWidthSpin.get_value();
+        this._group.opacity = this._opacitySpin.get_value();
+        this._group.apps = Array.from(this._selectedApps);
+
+        this._onSave(this._group);
+        this.close();
+    }
+});
 
 export default class TwoColumnDockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
-        const page = new Adw.PreferencesPage();
-        const group = new Adw.PreferencesGroup({
-            title: 'Dock Appearance',
-            description: 'Configure the look and feel of the dock.'
+        
+        // Get installed applications
+        const installedApps = this._getInstalledApps();
+
+        // Page 1: Dock Appearance
+        const appearancePage = new Adw.PreferencesPage({
+            title: 'Appearance',
+            icon_name: 'preferences-desktop-appearance-symbolic',
         });
-        page.add(group);
+
+        const dockGroup = new Adw.PreferencesGroup({
+            title: 'Dock Layout',
+            description: 'Configure the dock layout settings.'
+        });
+        appearancePage.add(dockGroup);
 
         // Columns
         const columnsRow = new Adw.ActionRow({ title: 'Number of Columns' });
         const columnsSpin = Gtk.SpinButton.new_with_range(1, 5, 1);
         settings.bind('columns', columnsSpin, 'value', Gio.SettingsBindFlags.DEFAULT);
         columnsRow.add_suffix(columnsSpin);
-        group.add(columnsRow);
+        dockGroup.add(columnsRow);
 
         // Icon Size
         const sizeRow = new Adw.ActionRow({ title: 'Icon Size (px)' });
         const sizeSpin = Gtk.SpinButton.new_with_range(16, 128, 4);
         settings.bind('icon-size', sizeSpin, 'value', Gio.SettingsBindFlags.DEFAULT);
         sizeRow.add_suffix(sizeSpin);
-        group.add(sizeRow);
+        dockGroup.add(sizeRow);
 
-        // Appearance Group
-        const appearanceGroup = new Adw.PreferencesGroup({
+        // Visual Style Group
+        const styleGroup = new Adw.PreferencesGroup({
             title: 'Visual Style',
-            description: 'Customize colors and shapes.'
+            description: 'Customize the dock appearance.'
         });
-        page.add(appearanceGroup);
+        appearancePage.add(styleGroup);
 
-        // Background Color (clickable color picker)
+        // Background Color
         const colorRow = new Adw.ActionRow({ title: 'Background Color' });
-        let colorButton;
-        try {
-            const dialog = new Gtk.ColorDialog();
-            colorButton = new Gtk.ColorDialogButton({ dialog });
-        } catch (e) {
-            colorButton = new Gtk.ColorButton();
-        }
-
-        // Initialize color
-        const initialHex = settings.get_string('background-color');
-        const rgba = new Gdk.RGBA();
-        rgba.parse(initialHex);
-        if (colorButton.set_rgba) {
-            colorButton.set_rgba(rgba);
-        } else {
-            colorButton.rgba = rgba;
-        }
-
-        // Sync changes back to settings
+        const colorButton = createColorButton(settings.get_string('background-color'));
         colorButton.connect('notify::rgba', () => {
-            const c = colorButton.rgba;
-            const hex = '#' +
-                Math.round(c.red * 255).toString(16).padStart(2, '0') +
-                Math.round(c.green * 255).toString(16).padStart(2, '0') +
-                Math.round(c.blue * 255).toString(16).padStart(2, '0');
-            settings.set_string('background-color', hex);
+            settings.set_string('background-color', getHexFromButton(colorButton));
         });
-
         colorRow.add_suffix(colorButton);
-        appearanceGroup.add(colorRow);
+        styleGroup.add(colorRow);
 
         // Opacity
         const opacityRow = new Adw.ActionRow({ title: 'Opacity (0.0 - 1.0)' });
         const opacitySpin = Gtk.SpinButton.new_with_range(0.0, 1.0, 0.05);
+        opacitySpin.set_digits(2);
         settings.bind('background-opacity', opacitySpin, 'value', Gio.SettingsBindFlags.DEFAULT);
         opacityRow.add_suffix(opacitySpin);
-        appearanceGroup.add(opacityRow);
+        styleGroup.add(opacityRow);
 
         // Corner Radius
         const radiusRow = new Adw.ActionRow({ title: 'Corner Radius' });
         const radiusSpin = Gtk.SpinButton.new_with_range(0, 50, 1);
         settings.bind('corner-radius', radiusSpin, 'value', Gio.SettingsBindFlags.DEFAULT);
         radiusRow.add_suffix(radiusSpin);
-        appearanceGroup.add(radiusRow);
+        styleGroup.add(radiusRow);
 
         // Multi-monitor
         const monitorGroup = new Adw.PreferencesGroup({
             title: 'Multi-Monitor',
         });
-        page.add(monitorGroup);
+        appearancePage.add(monitorGroup);
 
         const monitorRow = new Adw.SwitchRow({ title: 'Show on all monitors' });
         settings.bind('show-on-all-monitors', monitorRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         monitorGroup.add(monitorRow);
 
-        window.add(page);
+        window.add(appearancePage);
+
+        // Page 2: Groups
+        const groupsPage = new Adw.PreferencesPage({
+            title: 'Groups',
+            icon_name: 'folder-symbolic',
+        });
+
+        // Enable Groups Toggle
+        const enableGroup = new Adw.PreferencesGroup({
+            title: 'App Grouping',
+            description: 'Organize your dock apps into custom groups with distinct visual styles.'
+        });
+        groupsPage.add(enableGroup);
+
+        const enableGroupsRow = new Adw.SwitchRow({ 
+            title: 'Enable App Groups',
+            subtitle: 'When enabled, apps will be organized into defined groups'
+        });
+        settings.bind('enable-groups', enableGroupsRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        enableGroup.add(enableGroupsRow);
+
+        const showUngroupedRow = new Adw.SwitchRow({ 
+            title: 'Show Ungrouped Apps',
+            subtitle: 'Display apps not assigned to any group in an "Other" section'
+        });
+        settings.bind('show-ungrouped', showUngroupedRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        enableGroup.add(showUngroupedRow);
+
+        // Group Settings
+        const groupSettingsGroup = new Adw.PreferencesGroup({
+            title: 'Group Display Settings',
+        });
+        groupsPage.add(groupSettingsGroup);
+
+        const headerSizeRow = new Adw.ActionRow({ title: 'Group Header Size' });
+        const headerSizeSpin = Gtk.SpinButton.new_with_range(16, 40, 2);
+        settings.bind('group-header-size', headerSizeSpin, 'value', Gio.SettingsBindFlags.DEFAULT);
+        headerSizeRow.add_suffix(headerSizeSpin);
+        groupSettingsGroup.add(headerSizeRow);
+
+        const spacingRow = new Adw.ActionRow({ title: 'Space Between Groups' });
+        const spacingSpin = Gtk.SpinButton.new_with_range(0, 24, 2);
+        settings.bind('group-spacing', spacingSpin, 'value', Gio.SettingsBindFlags.DEFAULT);
+        spacingRow.add_suffix(spacingSpin);
+        groupSettingsGroup.add(spacingRow);
+
+        // Groups List
+        const groupsListGroup = new Adw.PreferencesGroup({
+            title: 'Defined Groups',
+            description: 'Create and manage your app groups. Use buttons to reorder.'
+        });
+        groupsPage.add(groupsListGroup);
+
+        // Add Group Button
+        const addGroupBtn = new Gtk.Button({
+            child: new Adw.ButtonContent({
+                icon_name: 'list-add-symbolic',
+                label: 'Add New Group',
+            }),
+            css_classes: ['suggested-action'],
+        });
+        addGroupBtn.connect('clicked', () => {
+            this._showGroupEditor(window, null, installedApps, settings, groupsListBox);
+        });
+
+        const addBtnBox = new Gtk.Box({
+            orientation: Gtk.Orientation.HORIZONTAL,
+            halign: Gtk.Align.CENTER,
+            margin_top: 8,
+            margin_bottom: 8,
+        });
+        addBtnBox.append(addGroupBtn);
+
+        // Groups ListBox
+        const groupsListBox = new Gtk.ListBox({
+            selection_mode: Gtk.SelectionMode.NONE,
+            css_classes: ['boxed-list'],
+        });
+
+        // Populate groups
+        this._populateGroupsList(groupsListBox, settings, window, installedApps);
+
+        // Watch for changes
+        settings.connect('changed::app-groups', () => {
+            this._populateGroupsList(groupsListBox, settings, window, installedApps);
+        });
+
+        const groupsFrame = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 8,
+        });
+        groupsFrame.append(groupsListBox);
+        groupsFrame.append(addBtnBox);
+        groupsListGroup.add(groupsFrame);
+
+        window.add(groupsPage);
+    }
+
+    _getInstalledApps() {
+        const apps = [];
+        const appSystem = Gio.AppInfo.get_all();
+        
+        for (let appInfo of appSystem) {
+            if (!appInfo.should_show()) continue;
+            
+            apps.push({
+                id: appInfo.get_id(),
+                name: appInfo.get_display_name(),
+                icon: appInfo.get_icon(),
+            });
+        }
+        
+        return apps;
+    }
+
+    _populateGroupsList(listBox, settings, window, installedApps) {
+        // Clear existing
+        let child = listBox.get_first_child();
+        while (child) {
+            let next = child.get_next_sibling();
+            listBox.remove(child);
+            child = next;
+        }
+
+        let groups = [];
+        try {
+            groups = JSON.parse(settings.get_string('app-groups')) || [];
+        } catch (e) {
+            groups = [];
+        }
+
+        if (groups.length === 0) {
+            const emptyRow = new Adw.ActionRow({
+                title: 'No groups defined',
+                subtitle: 'Click "Add New Group" to create your first group',
+            });
+            emptyRow.add_prefix(new Gtk.Image({
+                icon_name: 'folder-new-symbolic',
+                pixel_size: 32,
+            }));
+            listBox.append(emptyRow);
+            return;
+        }
+
+        for (let i = 0; i < groups.length; i++) {
+            const group = groups[i];
+            const row = new Adw.ActionRow({
+                title: group.name || 'Unnamed Group',
+                subtitle: `${(group.apps || []).length} apps`,
+            });
+
+            // Color indicator
+            const colorBox = new Gtk.DrawingArea({
+                content_width: 24,
+                content_height: 24,
+            });
+            colorBox.set_draw_func((area, cr, width, height) => {
+                const { r, g, b } = this._parseHexColor(group.color || '#333333');
+                cr.setSourceRGB(r / 255, g / 255, b / 255);
+                cr.arc(width / 2, height / 2, 10, 0, 2 * Math.PI);
+                cr.fill();
+                
+                // Border
+                const border = this._parseHexColor(group.borderColor || '#444444');
+                cr.setSourceRGB(border.r / 255, border.g / 255, border.b / 255);
+                cr.setLineWidth(2);
+                cr.arc(width / 2, height / 2, 10, 0, 2 * Math.PI);
+                cr.stroke();
+            });
+            row.add_prefix(colorBox);
+
+            // Edit button
+            const editBtn = new Gtk.Button({
+                icon_name: 'document-edit-symbolic',
+                valign: Gtk.Align.CENTER,
+                css_classes: ['flat'],
+                tooltip_text: 'Edit group',
+            });
+            editBtn.connect('clicked', () => {
+                this._showGroupEditor(window, group, installedApps, settings, listBox);
+            });
+            row.add_suffix(editBtn);
+
+            // Move up button
+            if (i > 0) {
+                const upBtn = new Gtk.Button({
+                    icon_name: 'go-up-symbolic',
+                    valign: Gtk.Align.CENTER,
+                    css_classes: ['flat'],
+                    tooltip_text: 'Move up',
+                });
+                upBtn.connect('clicked', () => {
+                    this._moveGroup(settings, i, -1, listBox, window, installedApps);
+                });
+                row.add_suffix(upBtn);
+            }
+
+            // Move down button
+            if (i < groups.length - 1) {
+                const downBtn = new Gtk.Button({
+                    icon_name: 'go-down-symbolic',
+                    valign: Gtk.Align.CENTER,
+                    css_classes: ['flat'],
+                    tooltip_text: 'Move down',
+                });
+                downBtn.connect('clicked', () => {
+                    this._moveGroup(settings, i, 1, listBox, window, installedApps);
+                });
+                row.add_suffix(downBtn);
+            }
+
+            // Delete button
+            const deleteBtn = new Gtk.Button({
+                icon_name: 'user-trash-symbolic',
+                valign: Gtk.Align.CENTER,
+                css_classes: ['flat', 'destructive-action'],
+                tooltip_text: 'Delete group',
+            });
+            deleteBtn.connect('clicked', () => {
+                this._deleteGroup(settings, group.id, listBox, window, installedApps);
+            });
+            row.add_suffix(deleteBtn);
+
+            listBox.append(row);
+        }
+    }
+
+    _showGroupEditor(window, group, installedApps, settings, listBox) {
+        const dialog = new GroupEditorDialog(group, installedApps, (savedGroup) => {
+            let groups = [];
+            try {
+                groups = JSON.parse(settings.get_string('app-groups')) || [];
+            } catch (e) {
+                groups = [];
+            }
+
+            if (group) {
+                // Update existing
+                const idx = groups.findIndex(g => g.id === savedGroup.id);
+                if (idx >= 0) {
+                    groups[idx] = savedGroup;
+                }
+            } else {
+                // Add new
+                groups.push(savedGroup);
+            }
+
+            settings.set_string('app-groups', JSON.stringify(groups));
+            this._populateGroupsList(listBox, settings, window, installedApps);
+        });
+
+        dialog.present(window);
+    }
+
+    _moveGroup(settings, index, direction, listBox, window, installedApps) {
+        let groups = [];
+        try {
+            groups = JSON.parse(settings.get_string('app-groups')) || [];
+        } catch (e) {
+            return;
+        }
+
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= groups.length) return;
+
+        // Swap
+        [groups[index], groups[newIndex]] = [groups[newIndex], groups[index]];
+        settings.set_string('app-groups', JSON.stringify(groups));
+        this._populateGroupsList(listBox, settings, window, installedApps);
+    }
+
+    _deleteGroup(settings, groupId, listBox, window, installedApps) {
+        let groups = [];
+        try {
+            groups = JSON.parse(settings.get_string('app-groups')) || [];
+        } catch (e) {
+            return;
+        }
+
+        groups = groups.filter(g => g.id !== groupId);
+        settings.set_string('app-groups', JSON.stringify(groups));
+        this._populateGroupsList(listBox, settings, window, installedApps);
+    }
+
+    _parseHexColor(hex) {
+        let r = 51, g = 51, b = 51;
+        if (hex && hex.match(/^#[0-9a-fA-F]{6}$/)) {
+            r = parseInt(hex.substring(1, 3), 16);
+            g = parseInt(hex.substring(3, 5), 16);
+            b = parseInt(hex.substring(5, 7), 16);
+        }
+        return { r, g, b };
     }
 }

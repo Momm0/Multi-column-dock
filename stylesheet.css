@@ -1,6 +1,12 @@
+/* Main dock container */
 .two-column-dock-container {
-    background-color: transparent; /* Handled in vfunc_paint */
+    background-color: transparent; /* Handled in code */
     border-radius: 0;
+}
+
+/* Main container for groups */
+.dock-main-container {
+    padding: 4px 0;
 }
 
 /* Aggressively target the app icon button to remove backgrounds */
@@ -28,6 +34,12 @@
     background-color: rgba(255, 255, 255, 0.15) !important;
     border-radius: 8px !important;
     transition-duration: 200ms;
+}
+
+/* Active/pressed state */
+.two-column-dock-container .app-well-app:active,
+.two-column-dock-container StButton:active {
+    background-color: rgba(255, 255, 255, 0.25) !important;
 }
 
 .dock-show-apps {
@@ -95,4 +107,159 @@
 .dock-badge-urgent {
     background-color: #ff0000;
     animation: pulse 1s infinite;
+}
+
+/* =====================================================
+   GROUP STYLES - Professional visual grouping
+   ===================================================== */
+
+/* Group Container */
+.dock-group-container {
+    border-radius: 8px;
+    margin: 4px;
+    padding: 0;
+    transition-duration: 200ms;
+}
+
+/* Group drop target highlight */
+.dock-group-drop-target {
+    background-color: rgba(52, 152, 219, 0.3) !important;
+    border: 2px dashed rgba(52, 152, 219, 0.8) !important;
+}
+
+/* Group Header */
+.dock-group-header {
+    padding: 4px 8px;
+    border-radius: 8px 8px 0 0;
+    transition-duration: 150ms;
+}
+
+.dock-group-header:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Collapse Icon */
+.dock-group-collapse-icon {
+    color: rgba(255, 255, 255, 0.6);
+    margin-right: 6px;
+    transition-duration: 150ms;
+}
+
+.dock-group-header:hover .dock-group-collapse-icon {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Group Label */
+.dock-group-label {
+    font-weight: bold;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.85);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Group Content Area */
+.dock-group-content {
+    padding: 4px;
+}
+
+/* Group Grid */
+.dock-group-grid {
+    padding: 2px;
+}
+
+/* =====================================================
+   PRESET GROUP COLOR THEMES
+   ===================================================== */
+
+/* AI/Development Group Theme */
+.dock-group-ai {
+    background-color: rgba(155, 89, 182, 0.3);
+    border-color: rgba(155, 89, 182, 0.6);
+}
+
+/* Communication Group Theme */
+.dock-group-communication {
+    background-color: rgba(52, 152, 219, 0.3);
+    border-color: rgba(52, 152, 219, 0.6);
+}
+
+/* Productivity Group Theme */
+.dock-group-productivity {
+    background-color: rgba(46, 204, 113, 0.3);
+    border-color: rgba(46, 204, 113, 0.6);
+}
+
+/* Media Group Theme */
+.dock-group-media {
+    background-color: rgba(231, 76, 60, 0.3);
+    border-color: rgba(231, 76, 60, 0.6);
+}
+
+/* System Group Theme */
+.dock-group-system {
+    background-color: rgba(149, 165, 166, 0.3);
+    border-color: rgba(149, 165, 166, 0.6);
+}
+
+/* =====================================================
+   COLLAPSED GROUP STYLES
+   ===================================================== */
+
+.dock-group-container.collapsed {
+    min-height: 24px;
+}
+
+.dock-group-container.collapsed .dock-group-header {
+    border-radius: 8px;
+    border-bottom: none;
+}
+
+/* =====================================================
+   SEPARATOR STYLES
+   ===================================================== */
+
+.dock-group-separator {
+    background-color: rgba(255, 255, 255, 0.15);
+    height: 1px;
+    margin: 4px 8px;
+}
+
+/* =====================================================
+   ANIMATIONS
+   ===================================================== */
+
+@keyframes pulse {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes groupExpand {
+    from { opacity: 0; max-height: 0; }
+    to { opacity: 1; max-height: 500px; }
+}
+
+@keyframes groupCollapse {
+    from { opacity: 1; max-height: 500px; }
+    to { opacity: 0; max-height: 0; }
+}
+
+/* =====================================================
+   RESPONSIVE ADJUSTMENTS
+   ===================================================== */
+
+/* Smaller screens - more compact groups */
+@media (max-height: 800px) {
+    .dock-group-header {
+        padding: 2px 6px;
+        min-height: 20px;
+    }
+    
+    .dock-group-label {
+        font-size: 10px;
+    }
+    
+    .dock-group-collapse-icon {
+        margin-right: 4px;
+    }
 }
