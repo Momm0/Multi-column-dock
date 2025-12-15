@@ -4,6 +4,15 @@
     border-radius: 0;
 }
 
+/* Position-specific dock styles */
+.two-column-dock-container.dock-position-left {
+    border-radius: 0 8px 8px 0;
+}
+
+.two-column-dock-container.dock-position-right {
+    border-radius: 8px 0 0 8px;
+}
+
 /* Main container for groups */
 .dock-main-container {
     padding: 4px 0;

@@ -332,8 +332,27 @@ export default class TwoColumnDockPreferences extends ExtensionPreferences {
         });
         appearancePage.add(dockGroup);
 
+        // Dock Position
+        const positionRow = new Adw.ActionRow({ 
+            title: 'Dock Position',
+            subtitle: 'Choose where the dock appears on screen'
+        });
+        const positionCombo = new Gtk.ComboBoxText();
+        positionCombo.append('left', 'Left');
+        positionCombo.append('right', 'Right');
+        positionCombo.set_active_id(settings.get_string('dock-position'));
+        positionCombo.connect('changed', () => {
+            settings.set_string('dock-position', positionCombo.get_active_id());
+        });
+        positionCombo.set_valign(Gtk.Align.CENTER);
+        positionRow.add_suffix(positionCombo);
+        dockGroup.add(positionRow);
+
         // Columns
-        const columnsRow = new Adw.ActionRow({ title: 'Number of Columns' });
+        const columnsRow = new Adw.ActionRow({ 
+            title: 'Number of Columns',
+            subtitle: 'Number of icon columns in the dock'
+        });
         const columnsSpin = Gtk.SpinButton.new_with_range(1, 5, 1);
         settings.bind('columns', columnsSpin, 'value', Gio.SettingsBindFlags.DEFAULT);
         columnsRow.add_suffix(columnsSpin);
@@ -403,13 +422,13 @@ export default class TwoColumnDockPreferences extends ExtensionPreferences {
         // Auto-hide Group
         const autoHideGroup = new Adw.PreferencesGroup({
             title: 'Auto-hide',
-            description: 'Configure the dock to hide automatically and appear when you move the mouse to the left edge.'
+            description: 'Configure the dock to hide automatically and appear when you move the mouse to the dock edge.'
         });
         appearancePage.add(autoHideGroup);
 
         const autoHideRow = new Adw.SwitchRow({ 
             title: 'Auto-hide Dock',
-            subtitle: 'Hide the dock and show it when mouse reaches the left edge'
+            subtitle: 'Hide the dock and show it when mouse reaches the dock edge'
         });
         settings.bind('auto-hide', autoHideRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         autoHideGroup.add(autoHideRow);
@@ -434,7 +453,7 @@ export default class TwoColumnDockPreferences extends ExtensionPreferences {
 
         const hotZoneRow = new Adw.ActionRow({ 
             title: 'Hot Zone Size (px)',
-            subtitle: 'Size of the invisible trigger area at the left edge'
+            subtitle: 'Size of the invisible trigger area at the dock edge'
         });
         const hotZoneSpin = Gtk.SpinButton.new_with_range(1, 20, 1);
         settings.bind('hot-zone-size', hotZoneSpin, 'value', Gio.SettingsBindFlags.DEFAULT);

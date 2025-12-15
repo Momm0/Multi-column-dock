@@ -94,7 +94,12 @@
     <key name="hot-zone-size" type="i">
       <default>5</default>
       <summary>Hot Zone Size</summary>
-      <description>Size in pixels of the invisible hot zone at the left edge of the screen that triggers the dock to appear.</description>
+      <description>Size in pixels of the invisible hot zone at the edge of the screen that triggers the dock to appear.</description>
+    </key>
+    <key name="dock-position" type="s">
+      <default>'left'</default>
+      <summary>Dock Position</summary>
+      <description>Position of the dock on the screen. Valid values are: 'left', 'right'.</description>
     </key>
   </schema>
 </schemalist>

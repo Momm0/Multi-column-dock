@@ -621,12 +621,9 @@ class DockView extends St.Widget {
 
         this.add_child(this._showAppsButton);
 
-        // Position on screen
-        const monitor = Main.layoutManager.primaryMonitor;
-        const panelHeight = Main.panel.height;
-        
-        this.set_position(monitor.x, monitor.y + panelHeight);
-        this.set_height(monitor.height - panelHeight); 
+        // Initial position will be set by _updateDockPosition called from extension
+        // Store position for later use
+        this._dockPosition = this._settings.get_string('dock-position');
 
         // Auto-hide state
         this._autoHideEnabled = false;
@@ -656,12 +653,31 @@ class DockView extends St.Widget {
         this._updateStyle();
         this._redisplay();
         
-        // Initialize auto-hide after a short delay to ensure dock width is calculated
+        // Initialize auto-hide after a short delay to ensure dock dimensions are calculated
         GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-            this._dockVisibleX = this.x;
+            this._storeVisiblePosition();
             this._updateAutoHide();
             return GLib.SOURCE_REMOVE;
         });
+    }
+    
+    // Store the visible position based on dock position setting
+    _storeVisiblePosition() {
+        this._dockVisibleX = this.x;
+    }
+    
+    // Update dock position when width changes (for right-side dock, expand to left)
+    _updatePositionForWidth(newWidth) {
+        const dockPosition = this._settings.get_string('dock-position');
+        if (dockPosition === 'right') {
+            // Get the monitor for this dock
+            const monitor = Main.layoutManager.monitors[this._monitorIndex];
+            if (monitor) {
+                const newX = monitor.x + monitor.width - newWidth;
+                this.set_x(newX);
+                this._storeVisiblePosition();
+            }
+        }
     }
 
     _onSettingsChanged(settings, key) {
@@ -684,9 +700,14 @@ class DockView extends St.Widget {
             this._updateAutoHide();
         }
         
+        // Dock position change requires full recreation (handled by extension)
+        if (key === 'dock-position') {
+            this._dockPosition = this._settings.get_string('dock-position');
+        }
+        
         this._redisplay();
         
-        if (key === 'background-color' || key === 'background-opacity' || key === 'corner-radius') {
+        if (key === 'background-color' || key === 'background-opacity' || key === 'corner-radius' || key === 'dock-position') {
             this._updateStyle();
         }
     }
@@ -753,15 +774,31 @@ class DockView extends St.Widget {
         const monitor = Main.layoutManager.monitors[this._monitorIndex] || Main.layoutManager.primaryMonitor;
         const panelHeight = Main.panel.height;
         const hotZoneSize = this._settings.get_int('hot-zone-size');
+        const position = this._settings.get_string('dock-position');
+        
+        let x, y, width, height;
+        
+        if (position === 'right') {
+            x = monitor.x + monitor.width - hotZoneSize;
+            y = monitor.y + panelHeight;
+            width = hotZoneSize;
+            height = monitor.height - panelHeight;
+        } else {
+            // Default to left
+            x = monitor.x;
+            y = monitor.y + panelHeight;
+            width = hotZoneSize;
+            height = monitor.height - panelHeight;
+        }
         
         this._hotZone = new St.Widget({
             name: 'dock-hot-zone',
             reactive: true,
             track_hover: true,
-            x: monitor.x,
-            y: monitor.y + panelHeight,
-            width: hotZoneSize,
-            height: monitor.height - panelHeight,
+            x: x,
+            y: y,
+            width: width,
+            height: height,
             // Make it invisible but still reactive
             opacity: 0,
         });
@@ -893,13 +930,21 @@ class DockView extends St.Widget {
         
         this._isHidden = true;
         
+        const position = this._settings.get_string('dock-position');
+        
         // Store the visible position if not already stored
         if (this._dockVisibleX === undefined) {
             this._dockVisibleX = this.x;
         }
         
-        // Calculate hidden position (off-screen to the left)
-        const hiddenX = this._dockVisibleX - this.get_width();
+        // Calculate hidden position based on dock position (left or right)
+        let hiddenX;
+        if (position === 'right') {
+            hiddenX = this._dockVisibleX + this.get_width();
+        } else {
+            // Default to left
+            hiddenX = this._dockVisibleX - this.get_width();
+        }
         
         // Show the hot zone when dock is hidden
         if (this._hotZone) {
@@ -1024,16 +1069,26 @@ class DockView extends St.Widget {
         let hex = this._settings.get_string('background-color');
         let opacity = this._settings.get_double('background-opacity');
         let radius = this._settings.get_int('corner-radius');
+        let position = this._settings.get_string('dock-position');
 
         const { r, g, b } = parseHexColor(hex);
         
         // Scale the corner radius
         const scaleFactor = this._scaleManager.getScaleFactor();
         const scaledRadius = Math.round(radius * scaleFactor);
+        
+        // Apply border-radius based on dock position (left or right)
+        let borderRadius;
+        if (position === 'right') {
+            borderRadius = `${scaledRadius}px 0 0 ${scaledRadius}px`;
+        } else {
+            // Default to left
+            borderRadius = `0 ${scaledRadius}px ${scaledRadius}px 0`;
+        }
 
         this.set_style(`
             background-color: rgba(${r}, ${g}, ${b}, ${opacity});
-            border-radius: 0 ${scaledRadius}px ${scaledRadius}px 0;
+            border-radius: ${borderRadius};
         `);
     }
 
@@ -1190,7 +1245,7 @@ class DockView extends St.Widget {
         let totalWidth;
         if (enableGroups) {
             // Add space for group margins (2px each side) and borders (1-2px each side)
-            // Plus extra buffer to prevent right-side cutoff
+            // Plus extra buffer to prevent cutoff
             const groupMargin = 4; // 2px margin on each side
             const groupBorder = 4; // border allowance
             const safetyBuffer = 16; // Extra space for scrollbars/rendering quirks
@@ -1200,6 +1255,9 @@ class DockView extends St.Widget {
         }
         
         this.set_width(totalWidth);
+        
+        // Reposition dock if on right side (expand to left, not right)
+        this._updatePositionForWidth(totalWidth);
 
         // Size Show Apps button
         if (this._showAppsButton) {
@@ -1245,7 +1303,7 @@ class DockView extends St.Widget {
     }
 
     _renderSimpleGrid(apps, columns, iconSize, totalIconSize, cellSpacing) {
-        // Create the legacy grid
+        // Create the legacy grid - vertical docks always use horizontal orientation (fill columns first)
         this._grid = new St.Widget({
             layout_manager: new Clutter.GridLayout({
                 orientation: Clutter.Orientation.HORIZONTAL,
@@ -1596,8 +1654,17 @@ class DockView extends St.Widget {
 
         // Lazily create and cache the menu per icon
         if (!wrapper._appMenu) {
-            // Dock is on the left: place menu to the right of the icon, with arrow on the left.
-            const menu = new PopupMenu.PopupMenu(wrapper, 0.5, St.Side.LEFT, 0);
+            // Determine menu side based on dock position (left or right)
+            const dockPosition = this._settings.get_string('dock-position');
+            let menuSide;
+            if (dockPosition === 'right') {
+                menuSide = St.Side.RIGHT; // Menu opens to the left, arrow on right
+            } else {
+                // Default to left
+                menuSide = St.Side.LEFT;  // Menu opens to the right, arrow on left
+            }
+            
+            const menu = new PopupMenu.PopupMenu(wrapper, 0.5, menuSide, 0);
             menu.box.add_style_class_name('dock-app-menu');
             Main.uiGroup.add_child(menu.actor);
             this._menuManager.addMenu(menu);
@@ -1742,8 +1809,19 @@ class DockView extends St.Widget {
         
         // Small offset for tooltip
         const offset = 8;
-        let tooltipX = Math.round(x + w + offset);
-        let tooltipY = Math.round(y + (h / 2) - (natH / 2));
+        const dockPosition = this._settings.get_string('dock-position');
+        
+        let tooltipX, tooltipY;
+        
+        if (dockPosition === 'right') {
+            // Tooltip to the left of the icon
+            tooltipX = Math.round(x - natW - offset);
+            tooltipY = Math.round(y + (h / 2) - (natH / 2));
+        } else {
+            // Default to left - tooltip to the right of the icon
+            tooltipX = Math.round(x + w + offset);
+            tooltipY = Math.round(y + (h / 2) - (natH / 2));
+        }
 
         this._tooltip.set_position(tooltipX, tooltipY);
     }
@@ -1865,8 +1943,9 @@ export default class TwoColumnDockExtension extends Extension {
         
         this._monitorsChangedId = Main.layoutManager.connect('monitors-changed', this._createDocks.bind(this));
         this._settings.connect('changed::show-on-all-monitors', this._createDocks.bind(this));
-        // Recreate docks when auto-hide changes to update struts
+        // Recreate docks when auto-hide or position changes to update struts
         this._settings.connect('changed::auto-hide', this._createDocks.bind(this));
+        this._settings.connect('changed::dock-position', this._createDocks.bind(this));
 
         // Hide original dash
         this._originalDash = Main.overview.dash;
@@ -1929,13 +2008,38 @@ export default class TwoColumnDockExtension extends Extension {
     }
 
     _updateDockPosition(dock, monitor) {
-        let yOffset = 0;
-        if (monitor.index === Main.layoutManager.primaryIndex) {
-            yOffset = Main.panel.height;
+        const dockPosition = this._settings.get_string('dock-position');
+        const isPrimary = monitor.index === Main.layoutManager.primaryIndex;
+        const panelHeight = isPrimary ? Main.panel.height : 0;
+        
+        let x, y, height;
+        
+        // Height is the same for both left and right positions
+        height = monitor.height - panelHeight;
+        y = monitor.y + panelHeight;
+        
+        if (dockPosition === 'right') {
+            // X position needs to account for dock width (set after width is known)
+            x = monitor.x + monitor.width - dock.get_width();
+        } else {
+            // Default to left
+            x = monitor.x;
         }
-
-        dock.set_position(monitor.x, monitor.y + yOffset);
-        dock.set_height(monitor.height - yOffset);
+        
+        dock.set_position(x, y);
+        dock.set_height(height);
+        
+        // Store visible position for auto-hide after positioning
+        dock._storeVisiblePosition();
+        
+        // For right position, we need to reposition after the dock calculates its size
+        if (dockPosition === 'right') {
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+                dock.set_x(monitor.x + monitor.width - dock.get_width());
+                dock._storeVisiblePosition();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
     }
 
     disable() {
