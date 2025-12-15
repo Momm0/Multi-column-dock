@@ -628,6 +628,13 @@ class DockView extends St.Widget {
         this.set_position(monitor.x, monitor.y + panelHeight);
         this.set_height(monitor.height - panelHeight); 
 
+        // Auto-hide state
+        this._autoHideEnabled = false;
+        this._isHidden = false;
+        this._showTimeoutId = 0;
+        this._hideTimeoutId = 0;
+        this._hotZone = null;
+
         // Badge tracking
         this._iconBadges = new Map();
         this._badgeListener = this._onBadgeUpdate.bind(this);
@@ -648,6 +655,13 @@ class DockView extends St.Widget {
 
         this._updateStyle();
         this._redisplay();
+        
+        // Initialize auto-hide after a short delay to ensure dock width is calculated
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+            this._dockVisibleX = this.x;
+            this._updateAutoHide();
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     _onSettingsChanged(settings, key) {
@@ -664,11 +678,259 @@ class DockView extends St.Widget {
                 log(`[Multi-Column Dock] Scale factor changed to: ${newScale === 0 ? 'Auto' : newScale}`);
             }
         }
+
+        // Handle auto-hide settings changes
+        if (key === 'auto-hide' || key === 'hot-zone-size') {
+            this._updateAutoHide();
+        }
         
         this._redisplay();
         
         if (key === 'background-color' || key === 'background-opacity' || key === 'corner-radius') {
             this._updateStyle();
+        }
+    }
+
+    // Auto-hide functionality
+    _updateAutoHide() {
+        const autoHide = this._settings.get_boolean('auto-hide');
+        
+        if (autoHide && !this._autoHideEnabled) {
+            this._enableAutoHide();
+        } else if (!autoHide && this._autoHideEnabled) {
+            this._disableAutoHide();
+        } else if (autoHide && this._autoHideEnabled) {
+            // Update hot zone size
+            this._destroyHotZone();
+            this._createHotZone();
+        }
+    }
+
+    _enableAutoHide() {
+        this._autoHideEnabled = true;
+        
+        // Connect enter/leave events to the dock itself
+        this._dockEnterEventId = this.connect('enter-event', () => {
+            this._onDockEnter();
+        });
+        this._dockLeaveEventId = this.connect('leave-event', () => {
+            this._onDockLeave();
+        });
+        
+        // Create the hot zone
+        this._createHotZone();
+        
+        // Initially hide the dock
+        this._hideDock(true);
+    }
+
+    _disableAutoHide() {
+        this._autoHideEnabled = false;
+        
+        // Disconnect events
+        if (this._dockEnterEventId) {
+            this.disconnect(this._dockEnterEventId);
+            this._dockEnterEventId = 0;
+        }
+        if (this._dockLeaveEventId) {
+            this.disconnect(this._dockLeaveEventId);
+            this._dockLeaveEventId = 0;
+        }
+        
+        // Remove hot zone
+        this._destroyHotZone();
+        
+        // Clear any pending timeouts
+        this._clearAutoHideTimeouts();
+        
+        // Show the dock
+        this._showDock(true);
+    }
+
+    _createHotZone() {
+        if (this._hotZone) return;
+        
+        const monitor = Main.layoutManager.monitors[this._monitorIndex] || Main.layoutManager.primaryMonitor;
+        const panelHeight = Main.panel.height;
+        const hotZoneSize = this._settings.get_int('hot-zone-size');
+        
+        this._hotZone = new St.Widget({
+            name: 'dock-hot-zone',
+            reactive: true,
+            track_hover: true,
+            x: monitor.x,
+            y: monitor.y + panelHeight,
+            width: hotZoneSize,
+            height: monitor.height - panelHeight,
+            // Make it invisible but still reactive
+            opacity: 0,
+        });
+        
+        this._hotZoneEnterEventId = this._hotZone.connect('enter-event', () => {
+            this._onHotZoneEnter();
+        });
+        
+        // Add to the chrome layer so it's always accessible
+        Main.layoutManager.addChrome(this._hotZone, {
+            affectsInputRegion: true,
+            trackFullscreen: true,
+        });
+    }
+
+    _destroyHotZone() {
+        if (this._hotZone) {
+            if (this._hotZoneEnterEventId) {
+                this._hotZone.disconnect(this._hotZoneEnterEventId);
+                this._hotZoneEnterEventId = 0;
+            }
+            Main.layoutManager.removeChrome(this._hotZone);
+            this._hotZone.destroy();
+            this._hotZone = null;
+        }
+    }
+
+    _onHotZoneEnter() {
+        if (!this._autoHideEnabled || !this._isHidden) return;
+        
+        const showDelay = this._settings.get_int('show-delay');
+        
+        this._clearAutoHideTimeouts();
+        
+        if (showDelay > 0) {
+            this._showTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, showDelay, () => {
+                this._showTimeoutId = 0;
+                this._showDock(false);
+                return GLib.SOURCE_REMOVE;
+            });
+        } else {
+            this._showDock(false);
+        }
+    }
+
+    _onDockEnter() {
+        if (!this._autoHideEnabled) return;
+        
+        // Cancel any pending hide
+        this._clearAutoHideTimeouts();
+    }
+
+    _onDockLeave() {
+        if (!this._autoHideEnabled || this._isHidden) return;
+        
+        // Check if we have an active popup menu open
+        if (this._hasActiveMenu()) return;
+        
+        const hideDelay = this._settings.get_int('auto-hide-delay');
+        
+        this._clearAutoHideTimeouts();
+        
+        if (hideDelay > 0) {
+            this._hideTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, hideDelay, () => {
+                this._hideTimeoutId = 0;
+                // Double check mouse position before hiding
+                if (!this._isMouseOverDock()) {
+                    this._hideDock(false);
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        } else {
+            if (!this._isMouseOverDock()) {
+                this._hideDock(false);
+            }
+        }
+    }
+
+    _hasActiveMenu() {
+        // Check if any popup menu is open
+        if (this._menuManager) {
+            try {
+                // Check if activeMenu exists and is open
+                if (this._menuManager._activeMenu && this._menuManager._activeMenu.isOpen) {
+                    return true;
+                }
+            } catch (e) {
+                // Fallback - no active menu
+            }
+        }
+        return false;
+    }
+
+    _isMouseOverDock() {
+        const [mouseX, mouseY] = global.get_pointer();
+        const [dockX, dockY] = this.get_transformed_position();
+        const [dockW, dockH] = this.get_transformed_size();
+        
+        return mouseX >= dockX && mouseX <= dockX + dockW &&
+               mouseY >= dockY && mouseY <= dockY + dockH;
+    }
+
+    _showDock(immediate) {
+        if (!this._isHidden) return;
+        
+        this._isHidden = false;
+        this.show();
+        
+        // Hide the hot zone when dock is visible
+        if (this._hotZone) {
+            this._hotZone.hide();
+        }
+        
+        if (immediate) {
+            this.set_x(this._dockVisibleX);
+            this.opacity = 255;
+        } else {
+            this.ease({
+                x: this._dockVisibleX,
+                opacity: 255,
+                duration: 200,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        }
+    }
+
+    _hideDock(immediate) {
+        if (this._isHidden) return;
+        
+        this._isHidden = true;
+        
+        // Store the visible position if not already stored
+        if (this._dockVisibleX === undefined) {
+            this._dockVisibleX = this.x;
+        }
+        
+        // Calculate hidden position (off-screen to the left)
+        const hiddenX = this._dockVisibleX - this.get_width();
+        
+        // Show the hot zone when dock is hidden
+        if (this._hotZone) {
+            this._hotZone.show();
+        }
+        
+        if (immediate) {
+            this.set_x(hiddenX);
+            this.opacity = 0;
+            this.hide();
+        } else {
+            this.ease({
+                x: hiddenX,
+                opacity: 0,
+                duration: 200,
+                mode: Clutter.AnimationMode.EASE_IN_QUAD,
+                onComplete: () => {
+                    this.hide();
+                }
+            });
+        }
+    }
+
+    _clearAutoHideTimeouts() {
+        if (this._showTimeoutId) {
+            GLib.source_remove(this._showTimeoutId);
+            this._showTimeoutId = 0;
+        }
+        if (this._hideTimeoutId) {
+            GLib.source_remove(this._hideTimeoutId);
+            this._hideTimeoutId = 0;
         }
     }
 
@@ -776,6 +1038,19 @@ class DockView extends St.Widget {
     }
 
     _onDestroy() {
+        // Clean up auto-hide resources
+        this._clearAutoHideTimeouts();
+        this._destroyHotZone();
+        
+        if (this._dockEnterEventId) {
+            this.disconnect(this._dockEnterEventId);
+            this._dockEnterEventId = 0;
+        }
+        if (this._dockLeaveEventId) {
+            this.disconnect(this._dockLeaveEventId);
+            this._dockLeaveEventId = 0;
+        }
+
         if (badgeManager && this._badgeListener) {
             badgeManager.removeListener(this._badgeListener);
         }
@@ -1535,6 +1810,8 @@ export default class TwoColumnDockExtension extends Extension {
         
         this._monitorsChangedId = Main.layoutManager.connect('monitors-changed', this._createDocks.bind(this));
         this._settings.connect('changed::show-on-all-monitors', this._createDocks.bind(this));
+        // Recreate docks when auto-hide changes to update struts
+        this._settings.connect('changed::auto-hide', this._createDocks.bind(this));
 
         // Hide original dash
         this._originalDash = Main.overview.dash;
@@ -1575,6 +1852,7 @@ export default class TwoColumnDockExtension extends Extension {
         this._docks = [];
 
         let showOnAll = this._settings.get_boolean('show-on-all-monitors');
+        let autoHide = this._settings.get_boolean('auto-hide');
         let monitors = Main.layoutManager.monitors;
 
         monitors.forEach((monitor, index) => {
@@ -1582,10 +1860,12 @@ export default class TwoColumnDockExtension extends Extension {
 
             let dock = new DockView(this._settings, index);
             
+            // When auto-hide is enabled, don't affect struts so apps can be fullscreen
+            // The dock will appear on top of windows
             Main.layoutManager.addChrome(dock, {
                 affectsInputRegion: true,
-                trackFullscreen: true,
-                affectsStruts: true, 
+                trackFullscreen: !autoHide,  // Don't track fullscreen in auto-hide mode
+                affectsStruts: !autoHide,    // Don't reserve space in auto-hide mode
             });
             
             this._updateDockPosition(dock, monitor);

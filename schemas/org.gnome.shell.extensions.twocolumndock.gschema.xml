@@ -76,5 +76,25 @@
       <summary>Scale Factor</summary>
       <description>Manual scale factor override for HiDPI displays. Set to 0 for automatic detection based on display resolution. Values between 1.0 and 3.0 are typical. For 4K displays, try 1.5-2.0.</description>
     </key>
+    <key name="auto-hide" type="b">
+      <default>false</default>
+      <summary>Auto-hide Dock</summary>
+      <description>When enabled, the dock will hide automatically and appear when you move the mouse to the left edge of the screen.</description>
+    </key>
+    <key name="auto-hide-delay" type="i">
+      <default>300</default>
+      <summary>Auto-hide Delay</summary>
+      <description>Delay in milliseconds before the dock hides after the mouse leaves.</description>
+    </key>
+    <key name="show-delay" type="i">
+      <default>100</default>
+      <summary>Show Delay</summary>
+      <description>Delay in milliseconds before the dock shows when the mouse enters the hot zone.</description>
+    </key>
+    <key name="hot-zone-size" type="i">
+      <default>5</default>
+      <summary>Hot Zone Size</summary>
+      <description>Size in pixels of the invisible hot zone at the left edge of the screen that triggers the dock to appear.</description>
+    </key>
   </schema>
 </schemalist>

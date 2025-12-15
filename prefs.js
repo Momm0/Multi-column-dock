@@ -400,6 +400,47 @@ export default class TwoColumnDockPreferences extends ExtensionPreferences {
         settings.bind('show-on-all-monitors', monitorRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         monitorGroup.add(monitorRow);
 
+        // Auto-hide Group
+        const autoHideGroup = new Adw.PreferencesGroup({
+            title: 'Auto-hide',
+            description: 'Configure the dock to hide automatically and appear when you move the mouse to the left edge.'
+        });
+        appearancePage.add(autoHideGroup);
+
+        const autoHideRow = new Adw.SwitchRow({ 
+            title: 'Auto-hide Dock',
+            subtitle: 'Hide the dock and show it when mouse reaches the left edge'
+        });
+        settings.bind('auto-hide', autoHideRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        autoHideGroup.add(autoHideRow);
+
+        const hideDelayRow = new Adw.ActionRow({ 
+            title: 'Hide Delay (ms)',
+            subtitle: 'Time before dock hides after mouse leaves'
+        });
+        const hideDelaySpin = Gtk.SpinButton.new_with_range(0, 2000, 50);
+        settings.bind('auto-hide-delay', hideDelaySpin, 'value', Gio.SettingsBindFlags.DEFAULT);
+        hideDelayRow.add_suffix(hideDelaySpin);
+        autoHideGroup.add(hideDelayRow);
+
+        const showDelayRow = new Adw.ActionRow({ 
+            title: 'Show Delay (ms)',
+            subtitle: 'Time before dock appears when mouse enters hot zone'
+        });
+        const showDelaySpin = Gtk.SpinButton.new_with_range(0, 1000, 50);
+        settings.bind('show-delay', showDelaySpin, 'value', Gio.SettingsBindFlags.DEFAULT);
+        showDelayRow.add_suffix(showDelaySpin);
+        autoHideGroup.add(showDelayRow);
+
+        const hotZoneRow = new Adw.ActionRow({ 
+            title: 'Hot Zone Size (px)',
+            subtitle: 'Size of the invisible trigger area at the left edge'
+        });
+        const hotZoneSpin = Gtk.SpinButton.new_with_range(1, 20, 1);
+        settings.bind('hot-zone-size', hotZoneSpin, 'value', Gio.SettingsBindFlags.DEFAULT);
+        hotZoneRow.add_suffix(hotZoneSpin);
+        autoHideGroup.add(hotZoneRow);
+
         // Display Scaling Group (for HiDPI/4K support)
         const scalingGroup = new Adw.PreferencesGroup({
             title: 'Display Scaling',
