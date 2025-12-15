@@ -15,9 +15,9 @@ import { DockView, setBadgeManager } from './dockView.js';
 let badgeManager = null;
 
 /**
- * TwoColumnDockExtension - Main extension class
+ * MultiColumnDockExtension - Main extension class
  */
-export default class TwoColumnDockExtension extends Extension {
+export default class MultiColumnDockExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._docks = [];

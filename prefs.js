@@ -312,7 +312,7 @@ class GroupEditorDialog extends Adw.Dialog {
     }
 });
 
-export default class TwoColumnDockPreferences extends ExtensionPreferences {
+export default class MultiColumnDockPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
         

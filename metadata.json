@@ -8,6 +8,6 @@
     "47"
   ],
   "url": "https://github.com/AITwinMinds/Multi-column-dock",
-  "settings-schema": "org.gnome.shell.extensions.twocolumndock",
+  "settings-schema": "org.gnome.shell.extensions.multicolumndock",
   "version": 1
 }

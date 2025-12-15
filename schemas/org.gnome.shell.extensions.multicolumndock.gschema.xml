@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.twocolumndock" path="/org/gnome/shell/extensions/twocolumndock/">
+  <schema id="org.gnome.shell.extensions.multicolumndock" path="/org/gnome/shell/extensions/multicolumndock/">
     <key name="columns" type="i">
       <default>2</default>
       <summary>Number of columns</summary>
