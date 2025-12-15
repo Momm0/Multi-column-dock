@@ -45,20 +45,17 @@
 .two-column-dock-container .show-apps {
     background-color: transparent;
     background-image: none;
-    background-gradient-direction: none;
     box-shadow: none;
     border: none;
     margin: 0 !important;
     padding: 0 !important;
     text-shadow: none;
-    icon-shadow: none;
 }
 
 /* Ensure the internal icon box doesn't add offsets */
 .two-column-dock-container .overview-icon {
     padding: 0 !important;
     margin: 0 !important;
-    spacing: 0 !important;
 }
 
 /* Restore hover effect for legacy */

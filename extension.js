@@ -9,6 +9,7 @@ import Pango from 'gi://Pango';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as AppFavorites from 'resource:///org/gnome/shell/ui/appFavorites.js';
 import * as DND from 'resource:///org/gnome/shell/ui/dnd.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import { AppIcon } from 'resource:///org/gnome/shell/ui/appDisplay.js';
 
@@ -503,6 +504,9 @@ class DockView extends St.Widget {
         });
         // Add to uiGroup to ensure it floats above everything (including the dock)
         Main.layoutManager.uiGroup.add_child(this._tooltip);
+
+        // Manage popup menus for app icons
+        this._menuManager = new PopupMenu.PopupMenuManager(this);
 
         // Main container for groups and ungrouped apps
         this._mainContainer = new St.BoxLayout({
@@ -1240,7 +1244,12 @@ class DockView extends St.Widget {
         });
 
         wrapper.connect('button-press-event', (actor, event) => {
-            if (event.get_button() === 1) {
+            const button = event.get_button();
+            if (button === 3) {
+                this._showAppMenu(wrapper, app);
+                return Clutter.EVENT_STOP;
+            }
+            if (button === 1) {
                 pressTime = GLib.get_monotonic_time();
                 [pressX, pressY] = event.get_coords();
             }
@@ -1302,6 +1311,58 @@ class DockView extends St.Widget {
         this._updateBadge(wrapper, badge, appId);
 
         return wrapper;
+    }
+
+    _showAppMenu(wrapper, app) {
+        if (!this._menuManager)
+            return;
+
+        // Lazily create and cache the menu per icon
+        if (!wrapper._appMenu) {
+            const menu = new PopupMenu.PopupMenu(wrapper, 0.5, St.Side.TOP, 0);
+            menu.box.add_style_class_name('dock-app-menu');
+            Main.uiGroup.add_child(menu.actor);
+            this._menuManager.addMenu(menu);
+            wrapper._appMenu = menu;
+
+            // Destroy with the icon to avoid leaks
+            wrapper.connect('destroy', () => {
+                if (wrapper._appMenu) {
+                    wrapper._appMenu.destroy();
+                    wrapper._appMenu = null;
+                }
+            });
+        } else {
+            wrapper._appMenu.removeAll();
+        }
+
+        const appId = app.get_id();
+        const isFavorite = this._appFavorites.isFavorite(appId);
+
+        const openItem = new PopupMenu.PopupMenuItem('Open');
+        openItem.connect('activate', () => this._activateApp(app));
+        wrapper._appMenu.addMenuItem(openItem);
+
+        const newWindowItem = new PopupMenu.PopupMenuItem('New Window');
+        newWindowItem.connect('activate', () => app.open_new_window(-1));
+        wrapper._appMenu.addMenuItem(newWindowItem);
+
+        const favoriteItem = new PopupMenu.PopupMenuItem(isFavorite ? 'Remove from Favorites' : 'Add to Favorites');
+        favoriteItem.connect('activate', () => {
+            if (this._appFavorites.isFavorite(appId))
+                this._appFavorites.removeFavorite(appId);
+            else
+                this._appFavorites.addFavorite(appId);
+        });
+        wrapper._appMenu.addMenuItem(favoriteItem);
+
+        wrapper._appMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        const quitItem = new PopupMenu.PopupMenuItem('Quit');
+        quitItem.connect('activate', () => app.request_quit());
+        wrapper._appMenu.addMenuItem(quitItem);
+
+        wrapper._appMenu.open(true);
     }
 
     _activateApp(app) {
