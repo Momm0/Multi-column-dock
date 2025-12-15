@@ -5,6 +5,8 @@ A powerful, customizable multi-column dock extension for GNOME Shell that brings
 ![GNOME Shell](https://img.shields.io/badge/GNOME_Shell-45%2B-blue?style=flat-square&logo=gnome)
 ![License](https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square)
 
+<img width="1070" height="1080" alt="Multi_column_deck" src="https://github.com/user-attachments/assets/b6061746-f4f7-4b3f-82a4-f36fef401de8" />
+
 ## ✨ Features
 
 ### Core Features
@@ -95,8 +97,6 @@ Visit [GNOME Extensions](https://extensions.gnome.org/) and search for "Multi-Co
 
 Open the extension preferences to customize all settings:
 
-<img width="762" height="741" alt="Preferences window" src="https://github.com/user-attachments/assets/59b49c92-d46b-48de-99b3-8133b6f0d689" />
-
 ### Appearance Settings
 | Setting | Description | Default |
 |---------|-------------|---------|
@@ -107,6 +107,8 @@ Open the extension preferences to customize all settings:
 | Background Color | Dock background color | #1e1e1e |
 | Background Opacity | Transparency level (0-1) | 0.95 |
 | Corner Radius | Dock corner roundness | 0 |
+
+<img width="668" height="898" alt="image" src="https://github.com/user-attachments/assets/45942203-fa49-4d58-a99f-feea2a472647" />
 
 ### Auto-Hide Settings
 | Setting | Description | Default |
@@ -124,6 +126,9 @@ Open the extension preferences to customize all settings:
 | Group Spacing | Space between groups | 8px |
 | Group Corner Radius | Group border roundness | 6 |
 | Show Ungrouped | Show "Other" section | On |
+
+<img width="668" height="898" alt="image" src="https://github.com/user-attachments/assets/6a192aaa-f8a6-40ed-9e67-0960e40d8319" />
+
 
 ### Display Settings
 | Setting | Description | Default |
@@ -146,6 +151,8 @@ Or through the GNOME Extensions app.
 4. Set the group name, colors, and appearance
 5. Select which apps belong to this group
 6. Enable "Enable Groups" in the Appearance tab
+
+<img width="668" height="898" alt="image" src="https://github.com/user-attachments/assets/dbfcdda9-bc28-40b3-a72e-1d3959720a00" />
 
 Groups can be reordered, collapsed, and styled individually!
 
