@@ -8,5 +8,8 @@
     "47"
   ],
   "url": "https://github.com/AITwinMinds/Multi-column-dock",
-  "settings-schema": "org.gnome.shell.extensions.multicolumndock"
+  "settings-schema": "org.gnome.shell.extensions.multicolumndock",
+  "donations": {
+    "custom": "https://github.com/AITwinMinds/Multi-column-dock/blob/main/DONATE.md"
+  }
 }
