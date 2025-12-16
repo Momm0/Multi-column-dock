@@ -67,6 +67,11 @@ export default class MultiColumnDockExtension extends Extension {
     _createDocks() {
         if (this._docks) {
             this._docks.forEach(dock => {
+                // Clean up position timeout before destroying
+                if (dock._positionTimeoutId) {
+                    GLib.source_remove(dock._positionTimeoutId);
+                    dock._positionTimeoutId = 0;
+                }
                 Main.layoutManager.removeChrome(dock);
                 dock.destroy();
             });
@@ -153,6 +158,11 @@ export default class MultiColumnDockExtension extends Extension {
 
         if (this._docks) {
             this._docks.forEach(dock => {
+                // Clean up position timeout before destroying
+                if (dock._positionTimeoutId) {
+                    GLib.source_remove(dock._positionTimeoutId);
+                    dock._positionTimeoutId = 0;
+                }
                 Main.layoutManager.removeChrome(dock);
                 dock.destroy();
             });

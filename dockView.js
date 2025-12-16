@@ -48,6 +48,7 @@ class DockView extends St.Widget {
         this._appFavorites = AppFavorites.getAppFavorites();
         this._groups = [];
         this._groupContainers = new Map();
+        this._iconWrappers = [];  // Track wrappers for timeout cleanup
         
         // Initialize ScaleManager for HiDPI support
         this._scaleManager = new ScaleManager(settings);
@@ -516,6 +517,21 @@ class DockView extends St.Widget {
         }
     }
 
+    _cleanupWrapperTimeouts() {
+        if (this._iconWrappers) {
+            for (const wrapper of this._iconWrappers) {
+                if (wrapper._dragEndTimeoutId) {
+                    GLib.source_remove(wrapper._dragEndTimeoutId);
+                    wrapper._dragEndTimeoutId = 0;
+                }
+                if (wrapper._activateTimeoutId) {
+                    GLib.source_remove(wrapper._activateTimeoutId);
+                    wrapper._activateTimeoutId = 0;
+                }
+            }
+        }
+    }
+
     _loadGroups() {
         try {
             let groupsJson = this._settings.get_string('app-groups');
@@ -630,6 +646,9 @@ class DockView extends St.Widget {
     }
 
     destroy() {
+        // Clean up wrapper timeouts
+        this._cleanupWrapperTimeouts();
+        
         // Clean up timeouts
         if (this._initTimeoutId) {
             GLib.source_remove(this._initTimeoutId);
@@ -749,10 +768,14 @@ class DockView extends St.Widget {
     }
 
     _redisplay() {
+        // Clean up wrapper timeouts before destroying
+        this._cleanupWrapperTimeouts();
+        
         // Clear existing children
         this._mainContainer.destroy_all_children();
         this._groupContainers.clear();
         this._iconBadges.clear();
+        this._iconWrappers = [];
 
         const columns = this._settings.get_int('columns');
         const iconSize = this._settings.get_int('icon-size');
@@ -1193,6 +1216,9 @@ class DockView extends St.Widget {
         let badge = this._createBadge();
         wrapper.add_child(badge);
         this._iconBadges.set(appId, { icon: wrapper, badge });
+        
+        // Track wrapper for timeout cleanup
+        this._iconWrappers.push(wrapper);
         this._updateBadge(wrapper, badge, appId);
 
         return wrapper;
