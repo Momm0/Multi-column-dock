@@ -1,9 +1,25 @@
 # Multi-Column Dock
 
-A powerful, customizable multi-column dock extension for GNOME Shell that brings a modern and efficient app launcher experience to your desktop with app grouping, auto-hide, and extensive customization options.
+<div align="center">
+  <img src="icon.png" alt="Multi-Column Dock Icon" width="128" height="128"/>
+  
+  <h3>A powerful, customizable multi-column dock extension for GNOME Shell</h3>
+  
+  <p>
+    <img src="https://img.shields.io/badge/GNOME_Shell-45%2B-blue?style=flat-square&logo=gnome" alt="GNOME Shell"/>
+    <img src="https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square" alt="License"/>
+  </p>
+  
+  <h3>
+    <a href="DONATE.md">
+      <img src="https://img.shields.io/badge/💙_Support_Development-Donate_Now-ff69b4?style=for-the-badge&labelColor=6e5494" alt="Donate Now"/>
+    </a>
+  </h3>
+  
+  <p><i>Bringing a modern and efficient app launcher experience to your desktop with app grouping, auto-hide, and extensive customization options.</i></p>
+</div>
 
-![GNOME Shell](https://img.shields.io/badge/GNOME_Shell-45%2B-blue?style=flat-square&logo=gnome)
-![License](https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square)
+---
 
 <img width="1070" height="1080" alt="Multi_column_deck" src="https://github.com/user-attachments/assets/b6061746-f4f7-4b3f-82a4-f36fef401de8" />
 
